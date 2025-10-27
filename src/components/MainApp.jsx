@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useGame } from '../contexts/GameContext';
 import { Button } from './ui/button';
@@ -22,6 +22,7 @@ const MainApp = () => {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
+  const [currentDateTime, setCurrentDateTime] = useState(new Date());
 
   // 팀 상세 및 라인업 모달 상태
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -40,12 +41,26 @@ const MainApp = () => {
   // 완료된 경기 다중 선택 상태
   const [selectedCompletedGames, setSelectedCompletedGames] = useState([]);
 
-  // 디버깅용 로그
-  console.log('🔍 [MainApp] teams:', teams);
-  console.log('🔍 [MainApp] games:', games);
-  console.log('🔍 [MainApp] finishedGames:', finishedGames);
-  console.log('🔍 [MainApp] loading:', loading);
-  console.log('🔍 [MainApp] user:', user);
+  // 현재 날짜/시간 업데이트
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentDateTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // 디버깅용 로그 (개발 환경에서만, 데이터 변경 시에만 출력)
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 [MainApp] Data updated:', {
+        teams: teams.length,
+        games: games.length,
+        finishedGames: finishedGames.length,
+        loading,
+        user: user?.email
+      });
+    }
+  }, [teams.length, games.length, finishedGames.length, loading, user?.email]);
 
   // 경기 목록 필터링
   const playingGames = games.filter(g => g.status === 'playing');
@@ -267,6 +282,33 @@ const MainApp = () => {
               </h1>
             </div>
 
+            {/* 중앙: 날짜/시간 */}
+            <div className="flex-1 flex justify-center">
+              <div className="flex items-center gap-3 px-4 py-2 bg-lime-50 text-gray-800 font-semibold rounded-full shadow-sm border border-lime-200">
+                <div className="flex items-center gap-1">
+                  <span className="text-lg">📆</span>
+                  <span className="text-base">
+                    {currentDateTime.toLocaleDateString('ko-KR', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      weekday: 'short'
+                    })}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-lg">⏱️</span>
+                  <span className="text-base">
+                    {currentDateTime.toLocaleTimeString('ko-KR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit'
+                    })}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* 사용자 프로필 */}
             <div className="flex items-center gap-4">
               <Avatar>
@@ -279,7 +321,7 @@ const MainApp = () => {
                 </p>
                 <p className="text-xs text-muted-foreground">{user?.email}</p>
               </div>
-              <Button onClick={signOut} variant="destructive" size="sm">
+              <Button onClick={signOut} size="sm" className="bg-red-100 hover:bg-red-200 text-red-700 border-red-200">
                 로그아웃
               </Button>
             </div>
@@ -394,9 +436,13 @@ const MainApp = () => {
         {dashboardView === 'teams' && (
           <div className="h-[calc(100vh-8rem)]">
             <div className="flex justify-between items-center mb-4">
-              <Button onClick={() => setDashboardView('dashboard')} variant="ghost">
-                ← 대시보드
-              </Button>
+              <button
+                onClick={() => setDashboardView('dashboard')}
+                className="flex items-center gap-2 px-4 py-2 bg-sky-100 hover:bg-sky-200 text-sky-700 font-medium rounded-full transition-all duration-200 shadow-sm hover:shadow-md"
+              >
+                <span>←</span>
+                <span>대시보드</span>
+              </button>
               <h2 className="text-2xl font-bold text-foreground">👥 학급/팀 관리</h2>
               <div className="w-24"></div> {/* 중앙 정렬을 위한 spacer */}
             </div>
@@ -409,16 +455,19 @@ const MainApp = () => {
           <div>
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-4">
-                <Button onClick={() => setDashboardView('dashboard')} variant="ghost">
-                  ← 대시보드
-                </Button>
+                <button
+                  onClick={() => setDashboardView('dashboard')}
+                  className="flex items-center gap-2 px-4 py-2 bg-sky-100 hover:bg-sky-200 text-sky-700 font-medium rounded-full transition-all duration-200 shadow-sm hover:shadow-md"
+                >
+                  <span>←</span>
+                  <span>대시보드</span>
+                </button>
                 <h2 className="text-2xl font-bold text-foreground">⚾ 경기 관리</h2>
               </div>
               <Button
                 onClick={() => setShowCreateGameModal(true)}
                 size="lg"
-                variant="default"
-                className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                className="bg-green-100 hover:bg-green-200 text-green-700 border-green-200"
               >
                 ⚾ 새 경기 시작
               </Button>
@@ -427,50 +476,47 @@ const MainApp = () => {
             {/* 진행 중인 경기 섹션 */}
         {playingGames.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-foreground mb-4">⚾ 진행 중인 경기</h2>
+            <h2 className="text-2xl font-bold text-foreground mb-4">▶️ 진행 중인 경기</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {playingGames.map((game) => (
                 <Card
                   key={game.id}
                   className="hover:shadow-lg transition-all duration-200 border-green-300 bg-green-50"
                 >
-                  <CardHeader>
-                    <CardTitle className="text-lg">
-                      {game.teamA.name} vs {game.teamB.name}
+                  <CardHeader className="text-center">
+                    <CardTitle className="text-lg text-black font-bold mb-1">
+                      ⚾ {game.teamA.name} vs {game.teamB.name}
                     </CardTitle>
-                    <CardDescription>
-                      <div>{game.currentInning}회 {game.isTopInning ? '초' : '말'}</div>
-                      {game.createdAt && (
-                        <div className="text-xs mt-1">
-                          시작: {(() => {
-                            try {
-                              const createdAt = game.createdAt;
-                              let timestamp;
+                    <CardDescription className="text-sm text-gray-700 font-medium">
+                      📅 {game.createdAt && (() => {
+                        try {
+                          const createdAt = game.createdAt;
+                          let timestamp;
 
-                              if (typeof createdAt === 'string') {
-                                timestamp = new Date(createdAt);
-                              } else if (createdAt?.toMillis) {
-                                timestamp = new Date(createdAt.toMillis());
-                              } else if (createdAt?.seconds) {
-                                timestamp = new Date(createdAt.seconds * 1000);
-                              } else if (typeof createdAt === 'number') {
-                                timestamp = new Date(createdAt);
-                              } else {
-                                timestamp = new Date();
-                              }
+                          if (typeof createdAt === 'string') {
+                            timestamp = new Date(createdAt);
+                          } else if (createdAt?.toMillis) {
+                            timestamp = new Date(createdAt.toMillis());
+                          } else if (createdAt?.seconds) {
+                            timestamp = new Date(createdAt.seconds * 1000);
+                          } else if (typeof createdAt === 'number') {
+                            timestamp = new Date(createdAt);
+                          } else {
+                            timestamp = new Date();
+                          }
 
-                              return timestamp.toLocaleDateString('ko-KR', {
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              });
-                            } catch (e) {
-                              return '시간 정보 없음';
-                            }
-                          })()}
-                        </div>
-                      )}
+                          const month = String(timestamp.getMonth() + 1).padStart(2, '0');
+                          const day = String(timestamp.getDate()).padStart(2, '0');
+                          const hours = String(timestamp.getHours()).padStart(2, '0');
+                          const minutes = String(timestamp.getMinutes()).padStart(2, '0');
+
+                          return `${month}/${day} ${hours}:${minutes}`;
+                        } catch (e) {
+                          return '시간 정보 없음';
+                        }
+                      })()}
+                      {' • '}
+                      ▶️ {game.currentInning}회 {game.isTopInning ? '초' : '말'}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -488,7 +534,7 @@ const MainApp = () => {
                     <div className="flex gap-2">
                       <Button
                         onClick={() => setSelectedGameId(game.id)}
-                        className="flex-1 bg-green-600 hover:bg-green-700"
+                        className="flex-1 bg-green-100 hover:bg-green-200 text-green-700 border-green-200"
                       >
                         경기 계속하기
                       </Button>
@@ -497,8 +543,8 @@ const MainApp = () => {
                           e.stopPropagation();
                           handleDeleteInProgressGame(game);
                         }}
-                        variant="destructive"
                         size="sm"
+                        className="bg-red-100 hover:bg-red-200 text-red-700 border-red-200"
                       >
                         🗑️
                       </Button>
@@ -514,7 +560,7 @@ const MainApp = () => {
             {completedGames.length > 0 && (
               <div className="mb-8">
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-2xl font-bold text-foreground">📊 완료된 경기</h2>
+                  <h2 className="text-2xl font-bold text-foreground">✔️ 완료된 경기</h2>
                   <div className="flex gap-2">
                     <Button
                       onClick={handleToggleAllCompletedGames}
@@ -526,8 +572,8 @@ const MainApp = () => {
                     {selectedCompletedGames.length > 0 && (
                       <Button
                         onClick={handleDeleteSelectedGames}
-                        variant="destructive"
                         size="sm"
+                        className="bg-red-100 hover:bg-red-200 text-red-700 border-red-200"
                       >
                         🗑️ 삭제 ({selectedCompletedGames.length})
                       </Button>
@@ -538,10 +584,10 @@ const MainApp = () => {
                   {completedGames.map((game) => (
                     <Card
                       key={game.id}
-                      className={`hover:shadow-lg transition-all duration-200 border-gray-300 ${
+                      className={`hover:shadow-lg transition-all duration-200 border-red-200 ${
                         selectedCompletedGames.includes(game.id)
-                          ? 'bg-blue-50 border-blue-400'
-                          : 'bg-gray-50'
+                          ? 'bg-red-100 border-red-300'
+                          : 'bg-red-50'
                       }`}
                     >
                       <CardHeader>
@@ -550,44 +596,42 @@ const MainApp = () => {
                             type="checkbox"
                             checked={selectedCompletedGames.includes(game.id)}
                             onChange={() => handleToggleCompletedGame(game.id)}
-                            className="mt-1 w-4 h-4 cursor-pointer"
+                            className="mt-2 w-4 h-4 cursor-pointer flex-shrink-0"
                           />
-                          <div className="flex-1">
-                            <CardTitle className="text-lg">
-                              {game.teamA.name} vs {game.teamB.name}
+                          <div className="flex-1 text-center">
+                            <CardTitle className="text-lg text-black font-bold mb-1">
+                              ⚾ {game.teamA.name} vs {game.teamB.name}
                             </CardTitle>
-                            <CardDescription>
-                              {(game.createdAt || game.finishedAt) && (
-                                <>
-                                  시작: {(() => {
-                                    try {
-                                      const createdAt = game.createdAt || game.finishedAt;
-                                      let timestamp;
+                            <CardDescription className="text-sm text-gray-700 font-medium">
+                              📅 {(game.finishedAt || game.createdAt) && (() => {
+                                try {
+                                  const finishedAt = game.finishedAt || game.createdAt;
+                                  let timestamp;
 
-                                      if (typeof createdAt === 'string') {
-                                        timestamp = new Date(createdAt);
-                                      } else if (createdAt?.toMillis) {
-                                        timestamp = new Date(createdAt.toMillis());
-                                      } else if (createdAt?.seconds) {
-                                        timestamp = new Date(createdAt.seconds * 1000);
-                                      } else if (typeof createdAt === 'number') {
-                                        timestamp = new Date(createdAt);
-                                      } else {
-                                        timestamp = new Date();
-                                      }
+                                  if (typeof finishedAt === 'string') {
+                                    timestamp = new Date(finishedAt);
+                                  } else if (finishedAt?.toMillis) {
+                                    timestamp = new Date(finishedAt.toMillis());
+                                  } else if (finishedAt?.seconds) {
+                                    timestamp = new Date(finishedAt.seconds * 1000);
+                                  } else if (typeof finishedAt === 'number') {
+                                    timestamp = new Date(finishedAt);
+                                  } else {
+                                    timestamp = new Date();
+                                  }
 
-                                      return timestamp.toLocaleDateString('ko-KR', {
-                                        month: 'short',
-                                        day: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                      });
-                                    } catch (e) {
-                                      return '시간 정보 없음';
-                                    }
-                                  })()}
-                                </>
-                              )}
+                                  const month = String(timestamp.getMonth() + 1).padStart(2, '0');
+                                  const day = String(timestamp.getDate()).padStart(2, '0');
+                                  const hours = String(timestamp.getHours()).padStart(2, '0');
+                                  const minutes = String(timestamp.getMinutes()).padStart(2, '0');
+
+                                  return `${month}/${day} ${hours}:${minutes}`;
+                                } catch (e) {
+                                  return '시간 정보 없음';
+                                }
+                              })()}
+                              {' • '}
+                              ✔️ 종료
                             </CardDescription>
                           </div>
                         </div>

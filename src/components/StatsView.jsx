@@ -4,7 +4,7 @@ import { calculatePlayerPoints } from '../utils/statsHelpers';
 import SelectedGamesModal from './SelectedGamesModal';
 
 const StatsView = ({ finishedGames, teams, onBack }) => {
-  const [statsSubTab, setStatsSubTab] = useState('history');
+  const [statsSubTab, setStatsSubTab] = useState('scoreboard');
   const [selectedGameIds, setSelectedGameIds] = useState([]);
   const [showSelectedGamesModal, setShowSelectedGamesModal] = useState(false);
 
@@ -15,9 +15,10 @@ const StatsView = ({ finishedGames, teams, onBack }) => {
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-bold transition"
+            className="flex items-center gap-2 px-4 py-2 bg-sky-100 hover:bg-sky-200 text-sky-700 font-medium rounded-full transition-all duration-200 shadow-sm hover:shadow-md"
           >
-            ← 뒤로
+            <span>←</span>
+            <span>대시보드</span>
           </button>
           <h1 className="text-2xl font-bold">📊 통합 통계</h1>
         </div>
@@ -33,16 +34,6 @@ const StatsView = ({ finishedGames, teams, onBack }) => {
           <div className="bg-white rounded-lg shadow-md p-2">
             <div className="flex gap-2 justify-center">
               <button
-                onClick={() => setStatsSubTab('history')}
-                className={`px-6 py-3 rounded-lg font-bold transition ${
-                  statsSubTab === 'history'
-                    ? 'bg-blue-500 text-white shadow-lg'
-                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                }`}
-              >
-                📋 경기 기록
-              </button>
-              <button
                 onClick={() => setStatsSubTab('scoreboard')}
                 className={`px-6 py-3 rounded-lg font-bold transition ${
                   statsSubTab === 'scoreboard'
@@ -51,6 +42,16 @@ const StatsView = ({ finishedGames, teams, onBack }) => {
                 }`}
               >
                 📊 통합 스코어보드
+              </button>
+              <button
+                onClick={() => setStatsSubTab('history')}
+                className={`px-6 py-3 rounded-lg font-bold transition ${
+                  statsSubTab === 'history'
+                    ? 'bg-blue-500 text-white shadow-lg'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                }`}
+              >
+                📋 경기 기록
               </button>
             </div>
           </div>

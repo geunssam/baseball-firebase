@@ -207,12 +207,15 @@ const BadgeCollection = ({ onBack }) => {
       {/* 헤더 */}
       <div className="border-b bg-card p-4">
         <div className="flex items-center justify-between mb-4">
-          <Button variant="ghost" onClick={onBack} size="sm">
-            <ChevronLeft className="w-4 h-4 mr-1" />
-            돌아가기
-          </Button>
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 px-4 py-2 bg-sky-100 hover:bg-sky-200 text-sky-700 font-medium rounded-full transition-all duration-200 shadow-sm hover:shadow-md"
+          >
+            <span>←</span>
+            <span>대시보드</span>
+          </button>
           <h1 className="text-2xl font-bold">🏆 배지 도감 (교사 대시보드)</h1>
-          <div className="w-20"></div>
+          <div className="w-24"></div>
         </div>
 
         {/* 전체 통계 */}

@@ -28,6 +28,11 @@ service cloud.firestore {
         allow write: if isOwner(userId);
       }
 
+      // 학생 데이터: 소유자만 읽기/쓰기
+      match /students/{studentId} {
+        allow read, write: if isOwner(userId);
+      }
+
       // 팀 데이터: 소유자만 읽기/쓰기 (간단 버전)
       match /teams/{teamId} {
         allow read, write: if isOwner(userId);

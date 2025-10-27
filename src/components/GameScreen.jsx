@@ -128,6 +128,7 @@ const GameScreen = ({ gameId, onExit }) => {
   const [isAttackEditMode, setIsAttackEditMode] = useState(false);
   const [isDefenseEditMode, setIsDefenseEditMode] = useState(false);
   const [tempAttackLineup, setTempAttackLineup] = useState(null); // 공격팀 편집 중 임시 라인업
+  const [currentDateTime, setCurrentDateTime] = useState(new Date()); // 현재 날짜/시간
   const [tempDefenseLineup, setTempDefenseLineup] = useState(null); // 수비팀 편집 중 임시 라인업
   const [activeId, setActiveId] = useState(null); // 드래그 중인 아이템 ID
   const [expandedHitRow, setExpandedHitRow] = useState(null); // 안타 추가 메뉴 확장된 행
@@ -236,6 +237,14 @@ const GameScreen = ({ gameId, onExit }) => {
   };
 
   // 게임 데이터 로드 및 선수 배지 로드
+  // 현재 날짜/시간 업데이트
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentDateTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     let badgeCheckInterval;
 
@@ -1575,10 +1584,9 @@ const GameScreen = ({ gameId, onExit }) => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* 상단 네비게이션 + 경기 컨트롤 통합 */}
+      {/* 상단 네비게이션 */}
       <nav className="bg-card shadow-lg border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* 단일 라인: 타이틀 + 경기 컨트롤 + 상태 + 뒤로가기 */}
           <div className="flex justify-between items-center h-16 gap-4">
             {/* 좌측: 타이틀 */}
             <div className="flex items-center gap-3 flex-shrink-0">
@@ -1588,76 +1596,35 @@ const GameScreen = ({ gameId, onExit }) => {
               </h1>
             </div>
 
-            {/* 중앙: 경기 컨트롤 (파스텔 퍼플 배경) */}
-            {game.status === 'playing' && (
-              <div className="flex-1 max-w-3xl">
-                {/* 모바일 토글 버튼 */}
-                <button
-                  onClick={() => setIsControlCollapsed(!isControlCollapsed)}
-                  className="md:hidden w-full flex items-center justify-center gap-2 py-2 px-3 text-sm text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors"
-                >
-                  <span>경기 컨트롤</span>
-                  <span className="text-xs">{isControlCollapsed ? '▼' : '▲'}</span>
-                </button>
-
-                {/* 컨트롤 버튼들 - 파스텔 퍼플 프레임 */}
-                <div className={`${isControlCollapsed ? 'hidden md:flex' : 'flex'} items-center justify-center gap-2 flex-wrap bg-purple-100 px-3 py-1.5 rounded-lg`}>
-                  <Button
-                    onClick={() => handleChangeInning(-1)}
-                    disabled={game.currentInning <= 1}
-                    variant="outline"
-                    size="sm"
-                    className="text-xs bg-white"
-                  >
-                    ⬅️ 이전 이닝
-                  </Button>
-                  <Button
-                    onClick={() => handleChangeInning(1)}
-                    disabled={game.currentInning >= game.innings}
-                    variant="outline"
-                    size="sm"
-                    className="text-xs bg-white"
-                  >
-                    다음 이닝 ➡️
-                  </Button>
-                  <Button
-                    onClick={handleSwitchTeams}
-                    variant="default"
-                    size="sm"
-                    className="text-xs bg-green-100 hover:bg-green-200 text-green-700"
-                  >
-                    🔄 공수교대
-                  </Button>
-                  <Button
-                    onClick={handleEndGame}
-                    variant="destructive"
-                    size="sm"
-                    className="text-xs bg-red-100 hover:bg-red-200 text-red-700"
-                  >
-                    🏁 경기 종료
-                  </Button>
+            {/* 중앙: 날짜/시간 */}
+            <div className="flex-1 flex justify-center">
+              <div className="flex items-center gap-3 px-4 py-2 bg-lime-50 text-gray-800 font-semibold rounded-full shadow-sm border border-lime-200">
+                <div className="flex items-center gap-1">
+                  <span className="text-lg">📆</span>
+                  <span className="text-base">
+                    {currentDateTime.toLocaleDateString('ko-KR', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      weekday: 'short'
+                    })}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-lg">⏱️</span>
+                  <span className="text-base">
+                    {currentDateTime.toLocaleTimeString('ko-KR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit'
+                    })}
+                  </span>
                 </div>
               </div>
-            )}
-
-            {/* 우측: 상태 + 뒤로가기 */}
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <Badge variant="outline" className="text-sm px-3 py-1">
-                {game.currentInning}회 {game.isTopInning ? '초' : '말'}
-              </Badge>
-              <Button
-                onClick={() => {
-                  if (confirm('메인 화면으로 돌아가시겠습니까?')) {
-                    onExit?.();
-                  }
-                }}
-                variant="outline"
-                size="sm"
-                className="text-xs"
-              >
-                뒤로 가기
-              </Button>
             </div>
+
+            {/* 우측: 빈 공간 (대칭을 위해) */}
+            <div className="flex-shrink-0" style={{ width: '100px' }}></div>
           </div>
         </div>
       </nav>
@@ -1671,20 +1638,34 @@ const GameScreen = ({ gameId, onExit }) => {
             <div className="lg:col-span-7">
               <Card className="bg-white shadow-lg h-full">
                 <CardContent className="p-6 w-full flex flex-col justify-center h-full">
-              {/* 현재 회차 및 공격팀 표시 */}
+              {/* 상단: 대시보드 버튼 + 회차 + 공격팀 + 이닝 버튼 */}
               <div className="flex items-center justify-between mb-4">
+                {/* 좌측: 대시보드 버튼 */}
+                <button
+                  onClick={() => {
+                    if (confirm('메인 화면으로 돌아가시겠습니까?')) {
+                      onExit?.();
+                    }
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-sky-100 hover:bg-sky-200 text-sky-700 font-medium rounded-full transition-all duration-200 shadow-sm hover:shadow-md"
+                >
+                  <span>←</span>
+                  <span>대시보드</span>
+                </button>
+
+                {/* 중앙: 회차 + 공격팀 */}
                 <div className="flex items-center gap-4">
-                  <div className="text-3xl font-bold text-blue-600">
+                  <div className="text-2xl font-bold text-blue-600">
                     {game.currentInning}회 {game.isTopInning ? '초' : '말'}
                   </div>
-                  <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2">
+                  <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-4 py-1.5 rounded-lg font-bold shadow-lg flex items-center gap-2">
                     <span>⚔️ 공격</span>
-                    <span className="text-xl">{attackTeam.name}</span>
+                    <span className="text-lg">{attackTeam.name}</span>
                   </div>
                 </div>
 
-                {/* 이닝 추가/삭제 버튼 */}
-                {!isCompleted && (
+                {/* 우측: 이닝 추가/삭제 버튼 */}
+                {!isCompleted ? (
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1 bg-gray-100 rounded px-2 py-1">
                       {/* 숫자 입력 필드 */}
@@ -1742,6 +1723,8 @@ const GameScreen = ({ gameId, onExit }) => {
                       🔍 확대
                     </button>
                   </div>
+                ) : (
+                  <div></div>
                 )}
               </div>
 
@@ -1836,6 +1819,58 @@ const GameScreen = ({ gameId, onExit }) => {
                   );
                 })()}
               </div>
+
+              {/* 경기 컨트롤 (파스텔 퍼플 배경) - 스코어보드 내부 하단 */}
+              {game.status === 'playing' && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  {/* 모바일 토글 버튼 */}
+                  <button
+                    onClick={() => setIsControlCollapsed(!isControlCollapsed)}
+                    className="md:hidden w-full flex items-center justify-center gap-2 py-2 px-3 text-sm text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors"
+                  >
+                    <span>경기 컨트롤</span>
+                    <span className="text-xs">{isControlCollapsed ? '▼' : '▲'}</span>
+                  </button>
+
+                  {/* 컨트롤 버튼들 - 파스텔 퍼플 프레임 */}
+                  <div className={`${isControlCollapsed ? 'hidden md:flex' : 'flex'} items-center justify-center gap-2 flex-wrap bg-purple-100 px-3 py-2 rounded-lg`}>
+                    <Button
+                      onClick={() => handleChangeInning(-1)}
+                      disabled={game.currentInning <= 1}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs bg-white"
+                    >
+                      ⬅️ 이전 이닝
+                    </Button>
+                    <Button
+                      onClick={() => handleChangeInning(1)}
+                      disabled={game.currentInning >= game.innings}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs bg-white"
+                    >
+                      다음 이닝 ➡️
+                    </Button>
+                    <Button
+                      onClick={handleSwitchTeams}
+                      variant="default"
+                      size="sm"
+                      className="text-xs bg-green-100 hover:bg-green-200 text-green-700"
+                    >
+                      🔄 공수교대
+                    </Button>
+                    <Button
+                      onClick={handleEndGame}
+                      variant="destructive"
+                      size="sm"
+                      className="text-xs bg-red-100 hover:bg-red-200 text-red-700"
+                    >
+                      🏁 경기 종료
+                    </Button>
+                  </div>
+                </div>
+              )}
                 </CardContent>
               </Card>
             </div>
