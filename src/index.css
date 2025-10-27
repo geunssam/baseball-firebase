@@ -1,0 +1,188 @@
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+/* 커스텀 애니메이션 */
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* 전역 스타일 */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@theme {
+  /* Border Radius */
+  --radius: 1rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Colors - 파스텔 테마 */
+  --color-background: oklch(1 0 0);  /* 순백 */
+  --color-foreground: oklch(0.2 0 0);  /* 어두운 텍스트 */
+
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.2 0 0);
+
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.2 0 0);
+
+  /* Primary: 파스텔 블루 */
+  --color-primary: oklch(0.92 0.04 220);
+  --color-primary-foreground: oklch(0.3 0.08 220);
+
+  /* Secondary: 파스텔 핑크 */
+  --color-secondary: oklch(0.94 0.04 340);
+  --color-secondary-foreground: oklch(0.3 0.08 340);
+
+  /* Muted: 매우 연한 회색 */
+  --color-muted: oklch(0.98 0 0);
+  --color-muted-foreground: oklch(0.5 0 0);
+
+  /* Accent: 파스텔 퍼플 */
+  --color-accent: oklch(0.93 0.04 290);
+  --color-accent-foreground: oklch(0.3 0.08 290);
+
+  --color-destructive: oklch(0.577 0.245 27.325);
+
+  --color-border: oklch(0.95 0 0);
+  --color-input: oklch(0.95 0 0);
+  --color-ring: oklch(0.92 0.04 220);
+
+  --color-chart-1: oklch(0.92 0.04 220);
+  --color-chart-2: oklch(0.94 0.04 340);
+  --color-chart-3: oklch(0.93 0.04 290);
+  --color-chart-4: oklch(0.92 0.04 140);
+  --color-chart-5: oklch(0.93 0.04 50);
+}
+
+:root {
+  --radius: 1rem;  /* 더 둥근 모서리 */
+
+  /* 파스텔 컬러 시스템 */
+  --pastel-blue-50: 224 242 254;   /* #E0F2FE */
+  --pastel-blue-100: 186 230 253;  /* #BAE6FD */
+  --pastel-pink-50: 252 231 243;   /* #FCE7F3 */
+  --pastel-pink-100: 251 207 232;  /* #FBCFE8 */
+  --pastel-purple-50: 243 232 255;  /* #F3E8FF */
+  --pastel-purple-100: 233 213 255; /* #E9D5FF */
+  --pastel-green-50: 220 252 231;   /* #DCFCE7 */
+
+  /* 기본 테마 (파스텔 톤) */
+  --background: oklch(1 0 0);  /* 순백 */
+  --foreground: oklch(0.2 0 0);  /* 어두운 텍스트 */
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0 0);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0 0);
+
+  /* Primary: 파스텔 블루 */
+  --primary: oklch(0.92 0.04 220);  /* 파스텔 블루 */
+  --primary-foreground: oklch(0.3 0.08 220);
+
+  /* Secondary: 파스텔 핑크 */
+  --secondary: oklch(0.94 0.04 340);  /* 파스텔 핑크 */
+  --secondary-foreground: oklch(0.3 0.08 340);
+
+  /* Muted: 매우 연한 회색 */
+  --muted: oklch(0.98 0 0);
+  --muted-foreground: oklch(0.5 0 0);
+
+  /* Accent: 파스텔 퍼플 */
+  --accent: oklch(0.93 0.04 290);  /* 파스텔 퍼플 */
+  --accent-foreground: oklch(0.3 0.08 290);
+
+  --destructive: oklch(0.577 0.245 27.325);
+
+  --border: oklch(0.95 0 0);
+  --input: oklch(0.95 0 0);
+  --ring: oklch(0.92 0.04 220);  /* 파스텔 블루 */
+
+  --chart-1: oklch(0.92 0.04 220);  /* 파스텔 블루 */
+  --chart-2: oklch(0.94 0.04 340);  /* 파스텔 핑크 */
+  --chart-3: oklch(0.93 0.04 290);  /* 파스텔 퍼플 */
+  --chart-4: oklch(0.92 0.04 140);  /* 파스텔 그린 */
+  --chart-5: oklch(0.93 0.04 50);   /* 파스텔 옐로우 */
+
+  --sidebar: oklch(0.99 0 0);
+  --sidebar-foreground: oklch(0.2 0 0);
+  --sidebar-primary: oklch(0.92 0.04 220);
+  --sidebar-primary-foreground: oklch(0.3 0.08 220);
+  --sidebar-accent: oklch(0.94 0.04 340);
+  --sidebar-accent-foreground: oklch(0.3 0.08 340);
+  --sidebar-border: oklch(0.95 0 0);
+  --sidebar-ring: oklch(0.92 0.04 220);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+}
