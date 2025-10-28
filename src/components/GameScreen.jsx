@@ -1775,46 +1775,155 @@ const GameScreen = ({ gameId, onExit }) => {
                       {/* 스코어보드 테이블 */}
                       <table className="w-full text-center border-collapse">
                         <thead>
-                          <tr className="bg-sky-100">
-                            <th className="border border-gray-300 p-3 font-bold text-base">팀</th>
-                            {visibleInnings.map((inningIndex) => (
-                              <th
-                                key={inningIndex}
-                                className={`border border-gray-300 p-3 text-base ${
-                                  inningIndex + 1 === game.currentInning ? 'bg-blue-200' : ''
-                                }`}
-                              >
-                                {inningIndex + 1}회 {inningIndex + 1 === game.currentInning && <span className="text-red-500">🔴</span>}
-                              </th>
-                            ))}
-                            <th className="border border-gray-300 p-3 bg-yellow-100 font-bold text-base">총점</th>
+                          <tr className="bg-gradient-to-r from-sky-100 to-blue-100">
+                            <th className="border-2 border-gray-300 p-1.5 tablet:p-2 tablet-lg:p-3 font-bold text-xs tablet:text-sm tablet-lg:text-base">팀</th>
+                            {visibleInnings.map((inningIndex) => {
+                              const isCurrentInning = inningIndex + 1 === game.currentInning;
+                              return (
+                                <th
+                                  key={inningIndex}
+                                  className={`border-2 border-gray-300 p-1.5 tablet:p-2 tablet-lg:p-3 text-xs tablet:text-sm tablet-lg:text-base transition-all ${
+                                    isCurrentInning
+                                      ? 'bg-gradient-to-br from-blue-400 to-blue-500 text-white font-bold shadow-lg scale-105'
+                                      : 'hover:bg-blue-50'
+                                  }`}
+                                >
+                                  {inningIndex + 1}회
+                                  {isCurrentInning && (
+                                    <span className="ml-1 inline-block animate-pulse">🔴</span>
+                                  )}
+                                </th>
+                              );
+                            })}
+                            <th className="border-2 border-gray-300 p-1.5 tablet:p-2 tablet-lg:p-3 bg-gradient-to-r from-yellow-100 to-amber-100 font-bold text-xs tablet:text-sm tablet-lg:text-base">
+                              총점
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
-                          <tr className={game.isTopInning ? 'bg-blue-50' : ''}>
-                            <td className="border border-gray-300 p-3 font-semibold text-base">{game.teamA.name}</td>
-                            {visibleInnings.map((inningIndex) => (
-                              <td key={inningIndex} className="border border-gray-300 p-3">
-                                <span className="font-bold text-2xl">{game.scoreBoard.teamA[inningIndex]}</span>
-                              </td>
-                            ))}
-                            <td className="border border-gray-300 p-3 text-3xl font-bold bg-yellow-50">
-                              {game.scoreBoard.teamATotal}
+                          {/* TeamA Row */}
+                          <tr className={`transition-all ${game.isTopInning ? 'bg-gradient-to-r from-blue-50 to-sky-50 shadow-inner' : 'hover:bg-gray-50'}`}>
+                            <td className="border-2 border-gray-300 p-1.5 tablet:p-2 tablet-lg:p-3 font-semibold text-xs tablet:text-sm tablet-lg:text-base">
+                              {game.teamA.name}
+                              {game.isTopInning && (
+                                <span className="ml-1 tablet:ml-2 text-red-500 font-bold">⚔️</span>
+                              )}
+                            </td>
+                            {visibleInnings.map((inningIndex) => {
+                              const score = game.scoreBoard.teamA[inningIndex];
+                              const hasScore = score > 0;
+                              return (
+                                <td
+                                  key={inningIndex}
+                                  className={`border-2 border-gray-300 p-1.5 tablet:p-2 tablet-lg:p-3 transition-all ${
+                                    hasScore ? 'bg-yellow-50 font-extrabold' : ''
+                                  }`}
+                                >
+                                  <span className={`text-lg tablet:text-xl tablet-lg:text-2xl ${hasScore ? 'text-orange-600' : 'text-gray-400'}`}>
+                                    {score}
+                                  </span>
+                                  {/* 득점 이닝 시각적 표시 */}
+                                  {hasScore && (
+                                    <div className="mt-0.5 tablet:mt-1 flex justify-center gap-0.5">
+                                      {Array.from({ length: Math.min(score, 5) }).map((_, i) => (
+                                        <span key={i} className="text-xs">⭐</span>
+                                      ))}
+                                      {score > 5 && <span className="text-xs">+{score - 5}</span>}
+                                    </div>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td className="border-2 border-gray-300 p-1.5 tablet:p-2 tablet-lg:p-3 bg-gradient-to-r from-yellow-50 to-amber-50">
+                              <div className="text-2xl tablet:text-3xl tablet-lg:text-4xl font-bold text-blue-600">
+                                {game.scoreBoard.teamATotal}
+                              </div>
                             </td>
                           </tr>
-                          <tr className={!game.isTopInning ? 'bg-blue-50' : ''}>
-                            <td className="border border-gray-300 p-3 font-semibold text-base">{game.teamB.name}</td>
-                            {visibleInnings.map((inningIndex) => (
-                              <td key={inningIndex} className="border border-gray-300 p-3">
-                                <span className="font-bold text-2xl">{game.scoreBoard.teamB[inningIndex]}</span>
-                              </td>
-                            ))}
-                            <td className="border border-gray-300 p-3 text-3xl font-bold bg-yellow-50">
-                              {game.scoreBoard.teamBTotal}
+
+                          {/* TeamB Row */}
+                          <tr className={`transition-all ${!game.isTopInning ? 'bg-gradient-to-r from-red-50 to-pink-50 shadow-inner' : 'hover:bg-gray-50'}`}>
+                            <td className="border-2 border-gray-300 p-1.5 tablet:p-2 tablet-lg:p-3 font-semibold text-xs tablet:text-sm tablet-lg:text-base">
+                              {game.teamB.name}
+                              {!game.isTopInning && (
+                                <span className="ml-1 tablet:ml-2 text-red-500 font-bold">⚔️</span>
+                              )}
+                            </td>
+                            {visibleInnings.map((inningIndex) => {
+                              const score = game.scoreBoard.teamB[inningIndex];
+                              const hasScore = score > 0;
+                              return (
+                                <td
+                                  key={inningIndex}
+                                  className={`border-2 border-gray-300 p-1.5 tablet:p-2 tablet-lg:p-3 transition-all ${
+                                    hasScore ? 'bg-yellow-50 font-extrabold' : ''
+                                  }`}
+                                >
+                                  <span className={`text-lg tablet:text-xl tablet-lg:text-2xl ${hasScore ? 'text-orange-600' : 'text-gray-400'}`}>
+                                    {score}
+                                  </span>
+                                  {/* 득점 이닝 시각적 표시 */}
+                                  {hasScore && (
+                                    <div className="mt-0.5 tablet:mt-1 flex justify-center gap-0.5">
+                                      {Array.from({ length: Math.min(score, 5) }).map((_, i) => (
+                                        <span key={i} className="text-xs">⭐</span>
+                                      ))}
+                                      {score > 5 && <span className="text-xs">+{score - 5}</span>}
+                                    </div>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td className="border-2 border-gray-300 p-1.5 tablet:p-2 tablet-lg:p-3 bg-gradient-to-r from-yellow-50 to-amber-50">
+                              <div className="text-2xl tablet:text-3xl tablet-lg:text-4xl font-bold text-red-600">
+                                {game.scoreBoard.teamBTotal}
+                              </div>
                             </td>
                           </tr>
                         </tbody>
                       </table>
+
+                      {/* Out 카운트 시각화 */}
+                      <div className="mt-4 flex justify-center items-center gap-2 bg-gray-100 py-3 rounded-lg">
+                        <span className="font-semibold text-gray-700">아웃 카운트:</span>
+                        <div className="flex gap-1">
+                          {Array.from({ length: game.outsPerInning || 3 }).map((_, i) => (
+                            <span key={i} className="text-2xl">
+                              {i < game.currentOuts ? '⚫' : '⚪'}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 점수 차이 시각화 바 */}
+                      <div className="mt-4 bg-white p-4 rounded-lg border-2 border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-semibold text-sm">{game.teamA.name}</span>
+                          <span className="font-semibold text-sm">{game.teamB.name}</span>
+                        </div>
+                        <div className="relative w-full h-8 bg-gray-200 rounded-full overflow-hidden">
+                          {(() => {
+                            const totalScore = game.scoreBoard.teamATotal + game.scoreBoard.teamBTotal || 1;
+                            const teamAPercent = (game.scoreBoard.teamATotal / totalScore) * 100;
+                            return (
+                              <>
+                                <div
+                                  className="absolute left-0 h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500"
+                                  style={{ width: `${teamAPercent}%` }}
+                                />
+                                <div
+                                  className="absolute right-0 h-full bg-gradient-to-l from-red-400 to-red-600 transition-all duration-500"
+                                  style={{ width: `${100 - teamAPercent}%` }}
+                                />
+                                <div className="absolute inset-0 flex items-center justify-between px-3 text-white font-bold text-sm">
+                                  <span>{game.scoreBoard.teamATotal}</span>
+                                  <span>{game.scoreBoard.teamBTotal}</span>
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
                     </>
                   );
                 })()}
