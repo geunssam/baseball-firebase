@@ -1583,9 +1583,9 @@ const GameScreen = ({ gameId, onExit }) => {
   const isCompleted = game.status === 'completed';
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen flex flex-col bg-background">
       {/* 상단 네비게이션 */}
-      <nav className="bg-card shadow-lg border-b border-border">
+      <nav className="bg-card shadow-lg border-b border-border flex-shrink-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 gap-4">
             {/* 좌측: 타이틀 */}
@@ -1630,16 +1630,15 @@ const GameScreen = ({ gameId, onExit }) => {
       </nav>
 
       {/* 메인 콘텐츠 */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-6">
-          {/* 스코어보드 + 진루상황 (7:3 비율) */}
-          <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
-            {/* 스코어보드 (7) */}
-            <div className="lg:col-span-7">
-              <Card className="bg-white shadow-lg h-full">
-                <CardContent className="p-6 w-full flex flex-col justify-center h-full">
+      <main className="flex-1 flex flex-col overflow-hidden py-2 px-4 max-w-7xl mx-auto w-full">
+        {/* 스코어보드 + 진루상황 (38% 높이) */}
+        <div className="flex-[0_0_38%] grid grid-cols-1 lg:grid-cols-10 gap-3 mb-2">
+          {/* 스코어보드 (8) */}
+          <div className="lg:col-span-8 flex flex-col">
+            <Card className="flex-1 flex flex-col overflow-hidden bg-white shadow-lg">
+              <CardContent className="flex-1 overflow-auto p-3 w-full flex flex-col justify-center">
               {/* 상단: 대시보드 버튼 + 회차 + 공격팀 + 이닝 버튼 */}
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-2">
                 {/* 좌측: 대시보드 버튼 */}
                 <button
                   onClick={() => {
@@ -1773,44 +1772,111 @@ const GameScreen = ({ gameId, onExit }) => {
                       </div>
 
                       {/* 스코어보드 테이블 */}
-                      <table className="w-full text-center border-collapse">
+                      <table className="w-full text-center border-collapse rounded-lg overflow-hidden shadow-lg">
                         <thead>
-                          <tr className="bg-sky-100">
-                            <th className="border border-gray-300 p-3 font-bold text-base">팀</th>
-                            {visibleInnings.map((inningIndex) => (
-                              <th
-                                key={inningIndex}
-                                className={`border border-gray-300 p-3 text-base ${
-                                  inningIndex + 1 === game.currentInning ? 'bg-blue-200' : ''
-                                }`}
-                              >
-                                {inningIndex + 1}회 {inningIndex + 1 === game.currentInning && <span className="text-red-500">🔴</span>}
-                              </th>
-                            ))}
-                            <th className="border border-gray-300 p-3 bg-yellow-100 font-bold text-base">총점</th>
+                          <tr className="bg-gradient-to-r from-sky-100 to-blue-100">
+                            <th className="border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 font-bold text-2xl tablet:text-3xl tablet-lg:text-4xl">팀</th>
+                            {visibleInnings.map((inningIndex) => {
+                              const isCurrentInning = inningIndex + 1 === game.currentInning;
+                              return (
+                                <th
+                                  key={inningIndex}
+                                  className={`border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 text-2xl tablet:text-3xl tablet-lg:text-4xl transition-all ${
+                                    isCurrentInning
+                                      ? 'bg-gradient-to-br from-blue-400 to-blue-500 text-white font-bold shadow-inner'
+                                      : 'hover:bg-blue-50'
+                                  }`}
+                                >
+                                  {inningIndex + 1}회
+                                  {isCurrentInning && (
+                                    <span className="ml-2 inline-block animate-pulse">🔴</span>
+                                  )}
+                                </th>
+                              );
+                            })}
+                            <th className="border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 bg-gradient-to-r from-yellow-100 to-amber-100 font-bold text-2xl tablet:text-3xl tablet-lg:text-4xl">
+                              총점
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
-                          <tr className={game.isTopInning ? 'bg-blue-50' : ''}>
-                            <td className="border border-gray-300 p-3 font-semibold text-base">{game.teamA.name}</td>
-                            {visibleInnings.map((inningIndex) => (
-                              <td key={inningIndex} className="border border-gray-300 p-3">
-                                <span className="font-bold text-2xl">{game.scoreBoard.teamA[inningIndex]}</span>
-                              </td>
-                            ))}
-                            <td className="border border-gray-300 p-3 text-3xl font-bold bg-yellow-50">
-                              {game.scoreBoard.teamATotal}
+                          {/* TeamA Row */}
+                          <tr className={`transition-all ${game.isTopInning ? 'bg-gradient-to-r from-blue-50 to-sky-50' : 'hover:bg-gray-50'}`}>
+                            <td className="border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 font-semibold text-2xl tablet:text-3xl tablet-lg:text-4xl">
+                              {game.teamA.name}
+                              {game.isTopInning && (
+                                <span className="ml-2 tablet:ml-3 text-red-500 font-bold text-xl tablet:text-2xl">⚔️</span>
+                              )}
+                            </td>
+                            {visibleInnings.map((inningIndex) => {
+                              const score = game.scoreBoard.teamA[inningIndex];
+                              const hasScore = score > 0;
+                              return (
+                                <td
+                                  key={inningIndex}
+                                  className={`border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 transition-all ${
+                                    hasScore ? 'bg-yellow-50 font-extrabold' : ''
+                                  }`}
+                                >
+                                  <span className={`text-4xl tablet:text-5xl tablet-lg:text-6xl ${hasScore ? 'text-orange-600' : 'text-gray-400'}`}>
+                                    {score}
+                                  </span>
+                                  {/* 득점 이닝 시각적 표시 */}
+                                  {hasScore && (
+                                    <div className="mt-2 flex justify-center gap-1">
+                                      {Array.from({ length: Math.min(score, 3) }).map((_, i) => (
+                                        <span key={i} className="text-lg">⭐</span>
+                                      ))}
+                                      {score > 3 && <span className="text-lg">+{score - 3}</span>}
+                                    </div>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td className="border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 bg-gradient-to-r from-yellow-50 to-amber-50">
+                              <div className="text-5xl tablet:text-6xl tablet-lg:text-7xl font-bold text-blue-600">
+                                {game.scoreBoard.teamATotal}
+                              </div>
                             </td>
                           </tr>
-                          <tr className={!game.isTopInning ? 'bg-blue-50' : ''}>
-                            <td className="border border-gray-300 p-3 font-semibold text-base">{game.teamB.name}</td>
-                            {visibleInnings.map((inningIndex) => (
-                              <td key={inningIndex} className="border border-gray-300 p-3">
-                                <span className="font-bold text-2xl">{game.scoreBoard.teamB[inningIndex]}</span>
-                              </td>
-                            ))}
-                            <td className="border border-gray-300 p-3 text-3xl font-bold bg-yellow-50">
-                              {game.scoreBoard.teamBTotal}
+
+                          {/* TeamB Row */}
+                          <tr className={`transition-all ${!game.isTopInning ? 'bg-gradient-to-r from-red-50 to-pink-50' : 'hover:bg-gray-50'}`}>
+                            <td className="border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 font-semibold text-2xl tablet:text-3xl tablet-lg:text-4xl">
+                              {game.teamB.name}
+                              {!game.isTopInning && (
+                                <span className="ml-2 tablet:ml-3 text-red-500 font-bold text-xl tablet:text-2xl">⚔️</span>
+                              )}
+                            </td>
+                            {visibleInnings.map((inningIndex) => {
+                              const score = game.scoreBoard.teamB[inningIndex];
+                              const hasScore = score > 0;
+                              return (
+                                <td
+                                  key={inningIndex}
+                                  className={`border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 transition-all ${
+                                    hasScore ? 'bg-yellow-50 font-extrabold' : ''
+                                  }`}
+                                >
+                                  <span className={`text-4xl tablet:text-5xl tablet-lg:text-6xl ${hasScore ? 'text-orange-600' : 'text-gray-400'}`}>
+                                    {score}
+                                  </span>
+                                  {/* 득점 이닝 시각적 표시 */}
+                                  {hasScore && (
+                                    <div className="mt-2 flex justify-center gap-1">
+                                      {Array.from({ length: Math.min(score, 3) }).map((_, i) => (
+                                        <span key={i} className="text-lg">⭐</span>
+                                      ))}
+                                      {score > 3 && <span className="text-lg">+{score - 3}</span>}
+                                    </div>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td className="border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 bg-gradient-to-r from-yellow-50 to-amber-50">
+                              <div className="text-5xl tablet:text-6xl tablet-lg:text-7xl font-bold text-red-600">
+                                {game.scoreBoard.teamBTotal}
+                              </div>
                             </td>
                           </tr>
                         </tbody>
@@ -1875,30 +1941,30 @@ const GameScreen = ({ gameId, onExit }) => {
               </Card>
             </div>
 
-            {/* 진루 상황 + 카운트 (3) */}
-            <div className="lg:col-span-3">
-              <Card className="bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200 h-full">
-                <CardHeader
-                  className="pb-1 pt-2 cursor-pointer hover:bg-gray-200/50 transition-colors rounded-t-lg"
-                  onClick={() => setIsFieldCollapsed(!isFieldCollapsed)}
-                >
-                  <CardTitle className="text-center text-green-800 text-sm flex items-center justify-center gap-2">
-                    <span>⚾ 주자 상황</span>
-                    <span className="text-xs text-gray-500">
-                      {isFieldCollapsed ? '▼' : '▲'}
-                    </span>
-                  </CardTitle>
-                </CardHeader>
-              <CardContent className="p-2">
+          {/* 진루 상황 + 카운트 (2) */}
+          <div className="lg:col-span-2 flex flex-col">
+            <Card className="flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200">
+              <CardHeader
+                className="pb-1 pt-2 flex-shrink-0 cursor-pointer hover:bg-gray-200/50 transition-colors rounded-t-lg"
+                onClick={() => setIsFieldCollapsed(!isFieldCollapsed)}
+              >
+                <CardTitle className="text-center text-green-800 text-sm flex items-center justify-center gap-2">
+                  <span>⚾ 주자 상황</span>
+                  <span className="text-xs text-gray-500">
+                    {isFieldCollapsed ? '▼' : '▲'}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col p-2 overflow-hidden">
                 {!isFieldCollapsed && (
-              <div className="flex flex-col items-center gap-2">
+              <div className="flex flex-col items-center justify-between h-full">
                 {/* 야구장 다이아몬드 */}
-                <div className="flex items-center justify-center py-3">
+                <div className="flex items-center justify-center flex-shrink-0">
                   <div
                     className="relative bg-gradient-to-br from-green-600 to-green-800 rounded-lg shadow-lg overflow-visible"
                     style={{
-                      width: '240px',
-                      height: '240px'
+                      width: '180px',
+                      height: '180px'
                     }}
                   >
                     {/* 내야 흙색 영역 */}
@@ -1924,7 +1990,7 @@ const GameScreen = ({ gameId, onExit }) => {
 
                     {/* 2루 (상단) */}
                     <div
-                      className={`absolute w-10 h-10 transform transition-all shadow-xl border-2 border-white ${
+                      className={`absolute w-8 h-8 transform transition-all shadow-xl border-2 border-white ${
                         game.runners?.second
                           ? 'bg-yellow-400 scale-110'
                           : 'bg-gray-100'
@@ -1943,7 +2009,7 @@ const GameScreen = ({ gameId, onExit }) => {
 
                     {/* 3루 (좌측) */}
                     <div
-                      className={`absolute w-10 h-10 transform transition-all shadow-xl border-2 border-white ${
+                      className={`absolute w-8 h-8 transform transition-all shadow-xl border-2 border-white ${
                         game.runners?.third
                           ? 'bg-yellow-400 scale-110'
                           : 'bg-gray-100'
@@ -1962,7 +2028,7 @@ const GameScreen = ({ gameId, onExit }) => {
 
                     {/* 1루 (우측) */}
                     <div
-                      className={`absolute w-10 h-10 transform transition-all shadow-xl border-2 border-white ${
+                      className={`absolute w-8 h-8 transform transition-all shadow-xl border-2 border-white ${
                         game.runners?.first
                           ? 'bg-yellow-400 scale-110'
                           : 'bg-gray-100'
@@ -1981,7 +2047,7 @@ const GameScreen = ({ gameId, onExit }) => {
 
                     {/* 홈베이스 */}
                     <div
-                      className="absolute w-10 h-10 bg-white transform shadow-xl border-2 border-white z-10"
+                      className="absolute w-8 h-8 bg-white transform shadow-xl border-2 border-white z-10"
                       style={{
                         top: '85%',
                         left: '50%',
@@ -1998,8 +2064,8 @@ const GameScreen = ({ gameId, onExit }) => {
 
                 {/* 주자 이름 표시 + 수동 조정 */}
                 {(game.runners?.first || game.runners?.second || game.runners?.third) && (
-                  <div className="w-full px-2">
-                    <div className="flex gap-1 text-xs flex-wrap">
+                  <div className="w-full px-1 mt-1">
+                    <div className="flex gap-1 text-[9px] flex-wrap">
                       {game.runners?.third && (
                         <div className="flex items-center gap-1 bg-yellow-100 px-1.5 py-0.5 rounded border border-yellow-300 flex-shrink-0">
                           <span className="font-semibold text-yellow-800 text-[10px] truncate max-w-[60px]">
@@ -2076,10 +2142,10 @@ const GameScreen = ({ gameId, onExit }) => {
                 )}
 
                 {/* 카운트 (아웃 + 스트라이크) */}
-                <div className="w-full px-2 space-y-2">
+                <div className="w-full px-1 space-y-1 mt-2">
                   {/* 아웃 카운트 (game.options.outs가 true일 때만 표시) */}
                   {game.options?.outs && (
-                    <div className="flex items-center justify-between bg-white rounded-lg p-1.5 shadow-sm border border-gray-200">
+                    <div className="flex items-center justify-between bg-white rounded-lg p-1 shadow-sm border border-gray-200">
                       <span className="font-bold text-gray-700 text-xs ml-1">아웃</span>
                       <div className="flex items-center gap-1">
                         <button
@@ -2113,7 +2179,7 @@ const GameScreen = ({ gameId, onExit }) => {
                   )}
 
                   {/* 스트라이크 카운트 */}
-                  <div className="flex items-center justify-between bg-white rounded-lg p-1.5 shadow-sm border border-gray-200">
+                  <div className="flex items-center justify-between bg-white rounded-lg p-1 shadow-sm border border-gray-200">
                     <span className="font-bold text-gray-700 text-xs ml-1">S</span>
                     <div className="flex items-center gap-1">
                       <button
@@ -2152,12 +2218,12 @@ const GameScreen = ({ gameId, onExit }) => {
             </div>
           </div>
 
-          {/* 공격팀/수비팀 라인업 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* 공격팀 */}
-            <Card className="bg-red-50/30 border-red-100">
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-center w-full">
+        {/* 공격팀/수비팀 라인업 (58% 높이) */}
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-3 min-h-0">
+          {/* 공격팀 */}
+          <Card className="flex flex-col overflow-hidden bg-red-50/30 border-red-100">
+            <CardHeader className="pb-2 flex-shrink-0">
+              <div className="flex justify-between items-center w-full">
                   <CardTitle className="text-red-700">⚾ 공격팀 - {attackTeam.name}</CardTitle>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -2195,9 +2261,9 @@ const GameScreen = ({ gameId, onExit }) => {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <table className="w-full text-sm table-fixed" style={{ height: '366px' }}>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-auto min-h-0 p-2">
+              <table className="w-full text-sm table-fixed">
                   <colgroup>
                     <col style={{ width: '12%' }} />
                     <col style={{ width: '28%' }} />
@@ -2586,9 +2652,9 @@ const GameScreen = ({ gameId, onExit }) => {
               </CardContent>
             </Card>
 
-            {/* 수비팀 */}
-            <Card className="bg-blue-50/30 border-blue-100">
-              <CardHeader className="pb-3">
+          {/* 수비팀 */}
+          <Card className="flex flex-col overflow-hidden bg-blue-50/30 border-blue-100">
+            <CardHeader className="pb-2 flex-shrink-0">
                 <div className="flex justify-between items-center w-full">
                   <CardTitle className="text-blue-700">🧤 수비팀 - {defenseTeam.name}</CardTitle>
                   <DropdownMenu>
@@ -2609,9 +2675,9 @@ const GameScreen = ({ gameId, onExit }) => {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <table className="w-full text-sm table-fixed" style={{ height: '366px' }}>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-auto min-h-0 p-2">
+              <table className="w-full text-sm table-fixed">
                   <colgroup>
                     <col style={{ width: '18%' }} />
                     <col style={{ width: '32%' }} />
@@ -2813,7 +2879,6 @@ const GameScreen = ({ gameId, onExit }) => {
                 </table>
               </CardContent>
             </Card>
-          </div>
         </div>
       </main>
 

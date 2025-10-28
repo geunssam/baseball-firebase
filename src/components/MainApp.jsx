@@ -15,6 +15,7 @@ import GameScreen from './GameScreen';
 import ClassTeamManagementView from './ClassTeamManagementView';
 import BadgeCollection from './BadgeCollection';
 import StatsView from './StatsView';
+import { useModalKeyboard } from '../hooks/useKeyboardShortcut';
 
 const MainApp = () => {
   const { user, signOut } = useAuth();
@@ -86,6 +87,9 @@ const MainApp = () => {
       alert('❌ 팀 생성에 실패했습니다: ' + error.message);
     }
   };
+
+  // 팀 생성 모달 키보드 단축키
+  useModalKeyboard(showCreateModal, () => setShowCreateModal(false), handleCreateTeam, [newTeamName]);
 
   const handleTeamClick = (team) => {
     setSelectedTeam(team);
@@ -273,21 +277,22 @@ const MainApp = () => {
     <div className="min-h-screen bg-background">
       {/* 상단 네비게이션 바 */}
       <nav className="bg-card shadow-lg border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">⚾</span>
-              <h1 className="text-xl font-bold text-card-foreground">
+        <div className="max-w-7xl mx-auto px-4 tablet:px-6 tablet-lg:px-8">
+          <div className="flex justify-between items-center h-14 tablet:h-16 tablet-lg:h-20">
+            {/* 좌측: 타이틀 */}
+            <div className="flex items-center gap-2 tablet:gap-3">
+              <span className="text-2xl tablet:text-3xl tablet-lg:text-4xl">⚾</span>
+              <h1 className="text-sm tablet:text-lg tablet-lg:text-xl font-bold text-card-foreground">
                 필드형 게임 마스터 보드
               </h1>
             </div>
 
-            {/* 중앙: 날짜/시간 */}
-            <div className="flex-1 flex justify-center">
-              <div className="flex items-center gap-3 px-4 py-2 bg-lime-50 text-gray-800 font-semibold rounded-full shadow-sm border border-lime-200">
+            {/* 중앙: 날짜/시간 - 태블릿 가로모드에서만 표시 */}
+            <div className="hidden tablet-lg:flex flex-1 justify-center">
+              <div className="flex items-center gap-2 tablet-lg:gap-3 px-3 tablet-lg:px-4 py-1.5 tablet-lg:py-2 bg-lime-50 text-gray-800 font-semibold rounded-full shadow-sm border border-lime-200">
                 <div className="flex items-center gap-1">
-                  <span className="text-lg">📆</span>
-                  <span className="text-base">
+                  <span className="text-base tablet-lg:text-lg">📆</span>
+                  <span className="text-sm tablet-lg:text-base">
                     {currentDateTime.toLocaleDateString('ko-KR', {
                       year: 'numeric',
                       month: 'long',
@@ -297,8 +302,8 @@ const MainApp = () => {
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="text-lg">⏱️</span>
-                  <span className="text-base">
+                  <span className="text-base tablet-lg:text-lg">⏱️</span>
+                  <span className="text-sm tablet-lg:text-base">
                     {currentDateTime.toLocaleTimeString('ko-KR', {
                       hour: '2-digit',
                       minute: '2-digit',
@@ -309,19 +314,20 @@ const MainApp = () => {
               </div>
             </div>
 
-            {/* 사용자 프로필 */}
-            <div className="flex items-center gap-4">
-              <Avatar>
+            {/* 우측: 프로필 */}
+            <div className="flex items-center gap-2 tablet:gap-4">
+              {/* 세로모드에서는 아바타만, 가로모드에서는 전체 정보 */}
+              <Avatar className="w-8 h-8 tablet:w-10 tablet:h-10">
                 <AvatarImage src={user?.photoURL} alt={user?.displayName} />
                 <AvatarFallback>{user?.displayName?.charAt(0) || 'U'}</AvatarFallback>
               </Avatar>
-              <div className="text-right">
+              <div className="hidden tablet-lg:block text-right">
                 <p className="text-sm font-semibold text-card-foreground">
                   {user?.displayName}
                 </p>
                 <p className="text-xs text-muted-foreground">{user?.email}</p>
               </div>
-              <Button onClick={signOut} size="sm" className="bg-red-100 hover:bg-red-200 text-red-700 border-red-200">
+              <Button onClick={signOut} size="sm" className="bg-red-100 hover:bg-red-200 text-red-700 border-red-200 text-xs tablet:text-sm">
                 로그아웃
               </Button>
             </div>
@@ -343,21 +349,21 @@ const MainApp = () => {
         {/* 대시보드 뷰 */}
         {dashboardView === 'dashboard' && (
           <div>
-            <h2 className="text-3xl font-bold text-foreground mb-8">대시보드</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <h2 className="text-2xl tablet:text-3xl font-bold text-foreground mb-4 tablet:mb-8">대시보드</h2>
+            <div className="grid grid-cols-2 tablet-lg:grid-cols-4 gap-3 tablet:gap-4 tablet-lg:gap-6">
               {/* 학급/팀 관리 카드 */}
               <Card
                 className="cursor-pointer hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200"
                 onClick={() => setDashboardView('teams')}
               >
-                <CardHeader>
-                  <div className="text-5xl mb-2">👥</div>
-                  <CardTitle className="text-xl">학급/팀 관리</CardTitle>
-                  <CardDescription>팀 생성 및 선수 관리</CardDescription>
+                <CardHeader className="p-3 tablet:p-4 tablet-lg:p-6">
+                  <div className="text-4xl tablet:text-5xl tablet-lg:text-6xl mb-2">👥</div>
+                  <CardTitle className="text-base tablet:text-lg tablet-lg:text-xl">학급/팀 관리</CardTitle>
+                  <CardDescription className="text-xs tablet:text-sm">팀 생성 및 선수 관리</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold text-blue-600">{teams.length}</p>
-                  <p className="text-sm text-muted-foreground">개 팀</p>
+                <CardContent className="p-3 tablet:p-4 tablet-lg:p-6 pt-0">
+                  <p className="text-2xl tablet:text-3xl font-bold text-blue-600">{teams.length}</p>
+                  <p className="text-xs tablet:text-sm text-muted-foreground">개 팀</p>
                 </CardContent>
               </Card>
 
@@ -366,19 +372,19 @@ const MainApp = () => {
                 className="cursor-pointer hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-br from-green-50 to-green-100 border-green-200"
                 onClick={() => setDashboardView('games')}
               >
-                <CardHeader>
-                  <div className="text-5xl mb-2">⚾</div>
-                  <CardTitle className="text-xl">경기 관리</CardTitle>
-                  <CardDescription>진행 중 및 완료된 경기</CardDescription>
+                <CardHeader className="p-3 tablet:p-4 tablet-lg:p-6">
+                  <div className="text-4xl tablet:text-5xl tablet-lg:text-6xl mb-2">⚾</div>
+                  <CardTitle className="text-base tablet:text-lg tablet-lg:text-xl">경기 관리</CardTitle>
+                  <CardDescription className="text-xs tablet:text-sm">진행 중 및 완료된 경기</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-3 tablet:p-4 tablet-lg:p-6 pt-0">
                   <div className="flex gap-4">
                     <div>
-                      <p className="text-2xl font-bold text-green-600">{playingGames.length}</p>
+                      <p className="text-xl tablet:text-2xl font-bold text-green-600">{playingGames.length}</p>
                       <p className="text-xs text-muted-foreground">진행 중</p>
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-gray-600">{completedGames.length}</p>
+                      <p className="text-xl tablet:text-2xl font-bold text-gray-600">{completedGames.length}</p>
                       <p className="text-xs text-muted-foreground">완료</p>
                     </div>
                   </div>
@@ -390,14 +396,14 @@ const MainApp = () => {
                 className="cursor-pointer hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200"
                 onClick={() => setDashboardView('stats')}
               >
-                <CardHeader>
-                  <div className="text-5xl mb-2">📊</div>
-                  <CardTitle className="text-xl">통합 통계</CardTitle>
-                  <CardDescription>완료된 경기 통합 스탯</CardDescription>
+                <CardHeader className="p-3 tablet:p-4 tablet-lg:p-6">
+                  <div className="text-4xl tablet:text-5xl tablet-lg:text-6xl mb-2">📊</div>
+                  <CardTitle className="text-base tablet:text-lg tablet-lg:text-xl">통합 통계</CardTitle>
+                  <CardDescription className="text-xs tablet:text-sm">완료된 경기 통합 스탯</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold text-purple-600">{completedGames.length}</p>
-                  <p className="text-sm text-muted-foreground">개 완료 경기</p>
+                <CardContent className="p-3 tablet:p-4 tablet-lg:p-6 pt-0">
+                  <p className="text-2xl tablet:text-3xl font-bold text-purple-600">{completedGames.length}</p>
+                  <p className="text-xs tablet:text-sm text-muted-foreground">개 완료 경기</p>
                 </CardContent>
               </Card>
 
@@ -406,26 +412,26 @@ const MainApp = () => {
                 className="cursor-pointer hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-br from-yellow-50 to-amber-100 border-yellow-200"
                 onClick={() => setDashboardView('badges')}
               >
-                <CardHeader>
-                  <div className="text-5xl mb-2">🏆</div>
-                  <CardTitle className="text-xl">배지 도감</CardTitle>
-                  <CardDescription>획득 가능한 모든 배지</CardDescription>
+                <CardHeader className="p-3 tablet:p-4 tablet-lg:p-6">
+                  <div className="text-4xl tablet:text-5xl tablet-lg:text-6xl mb-2">🏆</div>
+                  <CardTitle className="text-base tablet:text-lg tablet-lg:text-xl">배지 도감</CardTitle>
+                  <CardDescription className="text-xs tablet:text-sm">획득 가능한 모든 배지</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold text-amber-600">📖</p>
-                  <p className="text-sm text-muted-foreground">배지 컬렉션</p>
+                <CardContent className="p-3 tablet:p-4 tablet-lg:p-6 pt-0">
+                  <p className="text-2xl tablet:text-3xl font-bold text-amber-600">📖</p>
+                  <p className="text-xs tablet:text-sm text-muted-foreground">배지 컬렉션</p>
                 </CardContent>
               </Card>
 
               {/* 설정 카드 (향후 구현) */}
               <Card className="cursor-not-allowed opacity-50 bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-                <CardHeader>
-                  <div className="text-5xl mb-2">⚙️</div>
-                  <CardTitle className="text-xl">설정</CardTitle>
-                  <CardDescription>앱 설정 및 환경설정</CardDescription>
+                <CardHeader className="p-3 tablet:p-4 tablet-lg:p-6">
+                  <div className="text-4xl tablet:text-5xl tablet-lg:text-6xl mb-2">⚙️</div>
+                  <CardTitle className="text-base tablet:text-lg tablet-lg:text-xl">설정</CardTitle>
+                  <CardDescription className="text-xs tablet:text-sm">앱 설정 및 환경설정</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">준비 중...</p>
+                <CardContent className="p-3 tablet:p-4 tablet-lg:p-6 pt-0">
+                  <p className="text-xs tablet:text-sm text-muted-foreground">준비 중...</p>
                 </CardContent>
               </Card>
             </div>
@@ -474,9 +480,9 @@ const MainApp = () => {
             </div>
 
             {/* 진행 중인 경기 섹션 */}
-        {playingGames.length > 0 && (
-          <div className="mb-8">
             <h2 className="text-2xl font-bold text-foreground mb-4">▶️ 진행 중인 경기</h2>
+        {playingGames.length > 0 ? (
+          <div className="mb-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {playingGames.map((game) => (
                 <Card
@@ -554,13 +560,32 @@ const MainApp = () => {
               ))}
             </div>
           </div>
+        ) : (
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-md p-10 text-center border-2 border-dashed border-green-200 mb-8">
+            <div className="mb-4">
+              <span className="text-7xl">🏟️</span>
+            </div>
+            <h3 className="text-xl font-bold text-gray-700 mb-2">
+              진행 중인 경기가 없습니다
+            </h3>
+            <p className="text-gray-500 mb-4">
+              새로운 경기를 시작해보세요!
+            </p>
+            <button
+              onClick={() => setShowCreateGameModal(true)}
+              className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all transform hover:scale-105"
+            >
+              ⚾ 경기 시작
+            </button>
+          </div>
         )}
 
             {/* 완료된 경기 섹션 */}
-            {completedGames.length > 0 && (
+            <h2 className="text-2xl font-bold text-foreground mb-4">✔️ 완료된 경기</h2>
+            {completedGames.length > 0 ? (
               <div className="mb-8">
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-2xl font-bold text-foreground">✔️ 완료된 경기</h2>
+                  <div></div>
                   <div className="flex gap-2">
                     <Button
                       onClick={handleToggleAllCompletedGames}
@@ -660,6 +685,18 @@ const MainApp = () => {
                   ))}
                 </div>
               </div>
+            ) : (
+              <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl shadow-md p-10 text-center border-2 border-dashed border-gray-200 mb-8">
+                <div className="mb-4">
+                  <span className="text-7xl">📋</span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-700 mb-2">
+                  완료된 경기가 없습니다
+                </h3>
+                <p className="text-gray-500">
+                  경기를 완료하면 여기에 기록이 저장됩니다
+                </p>
+              </div>
             )}
           </div>
         )}
@@ -711,9 +748,11 @@ const MainApp = () => {
                   setNewTeamName('');
                 }}
               >
-                취소
+                취소 <kbd className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 rounded border">ESC</kbd>
               </Button>
-              <Button onClick={handleCreateTeam}>생성</Button>
+              <Button onClick={handleCreateTeam}>
+                생성 <kbd className="ml-2 px-1.5 py-0.5 text-xs bg-blue-100 rounded border">Enter</kbd>
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

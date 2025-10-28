@@ -5,6 +5,7 @@ import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import TeamSelectModal from './TeamSelectModal';
+import { useModalKeyboard } from '../hooks/useKeyboardShortcut';
 
 /**
  * CreateGameModal
@@ -258,6 +259,9 @@ const CreateGameModal = ({ open, onOpenChange, teams, onCreateGame, defaultInnin
   // 선택 가능한 팀 (선수가 있는 팀만)
   const availableTeams = teams.filter(t => t.players && t.players.length > 0);
 
+  // 키보드 단축키: ESC로 닫기, Enter로 경기 시작
+  useModalKeyboard(open, () => onOpenChange(false), handleCreate, [inningTeams, innings]);
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -490,10 +494,10 @@ const CreateGameModal = ({ open, onOpenChange, teams, onCreateGame, defaultInnin
 
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
-              취소
+              취소 <kbd className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 rounded border">ESC</kbd>
             </Button>
             <Button onClick={handleCreate} disabled={availableTeams.length < 1}>
-              경기 시작 →
+              경기 시작 → <kbd className="ml-2 px-1.5 py-0.5 text-xs bg-blue-100 rounded border">Enter</kbd>
             </Button>
           </DialogFooter>
         </DialogContent>

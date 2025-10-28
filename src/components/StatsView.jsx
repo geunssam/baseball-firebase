@@ -25,8 +25,32 @@ const StatsView = ({ finishedGames, teams, onBack }) => {
       </div>
 
       {finishedGames.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-lg p-8 text-center text-gray-500">
-          종료된 경기가 없습니다.
+        <div className="bg-gradient-to-br from-blue-50 to-sky-50 rounded-lg shadow-lg p-12 text-center">
+          {/* 애니메이션 야구공 */}
+          <div className="mb-6 flex justify-center">
+            <div className="relative">
+              <div className="text-8xl animate-bounce">⚾</div>
+              <div className="absolute inset-0 text-8xl animate-ping opacity-20">⚾</div>
+            </div>
+          </div>
+
+          {/* 제목 */}
+          <h3 className="text-2xl font-bold text-gray-700 mb-3">
+            아직 경기 기록이 없어요
+          </h3>
+
+          {/* 설명 */}
+          <p className="text-gray-500 mb-6 text-lg">
+            첫 경기를 시작하고 멋진 기록을 만들어보세요!
+          </p>
+
+          {/* CTA 버튼 */}
+          <button
+            onClick={onBack}
+            className="px-8 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+          >
+            ⚾ 대시보드로 돌아가기
+          </button>
         </div>
       ) : (
         <>
