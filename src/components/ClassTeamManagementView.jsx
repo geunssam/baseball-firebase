@@ -1088,30 +1088,13 @@ export default function ClassTeamManagementView() {
                         onClick={() => toggleStudentSelection(student.id)}
                         className="w-full text-left"
                       >
-                        <div className="flex items-center gap-1">
-                          <span className="text-sm">
+                        {/* 이름 (크고 굵게) */}
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-base">
                             {student.gender === 'male' ? '👨‍🎓' : student.gender === 'female' ? '👩‍🎓' : '👨‍🎓'}
                           </span>
-                          <span>{student.name}</span>
+                          <span className="font-bold text-sm">{student.name}</span>
                         </div>
-                        {student.studentCode && (
-                          <div className="mt-1 flex items-center gap-1">
-                            <span className="text-[10px] text-muted-foreground font-mono">
-                              {student.studentCode}
-                            </span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigator.clipboard.writeText(student.studentCode);
-                                alert(`${student.name}의 코드가 복사되었습니다!\n코드: ${student.studentCode}`);
-                              }}
-                              className="text-[10px] text-blue-500 hover:text-blue-700"
-                              title="코드 복사"
-                            >
-                              📋
-                            </button>
-                          </div>
-                        )}
                       </button>
                       {isClassEditMode && (
                         <button
@@ -1401,30 +1384,54 @@ export default function ClassTeamManagementView() {
       {/* ============================================ */}
       {/* 학생 일괄 추가 모달 */}
       {/* ============================================ */}
-      <Dialog open={showAddStudentsModal} onOpenChange={setShowAddStudentsModal}>
+      <Dialog open={showAddStudentsModal} onOpenChange={(open) => {
+        setShowAddStudentsModal(open);
+        if (!open) {
+          // 모달이 닫힐 때 항상 초기화
+          setBulkStudentNames('');
+          setTargetClass('');
+        }
+      }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{targetClass} - 학생 추가</DialogTitle>
-            <DialogDescription>
-              한 줄에 한 명씩 입력하세요. (형식: 이름,성별)<br />
-              성별은 '남/여' 또는 'male/female'로 입력 가능합니다.<br />
-              성별을 생략하면 이름만 추가됩니다.
-            </DialogDescription>
           </DialogHeader>
+          <div className="space-y-2 py-2">
+            <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <span className="text-lg">✅</span>
+              <div className="flex-1 text-sm">
+                <div className="font-bold text-blue-900 mb-1">
+                  입력 형식
+                </div>
+                <div className="text-blue-800">
+                  • <strong>한 줄에 한 명씩</strong> 입력하세요<br />
+                  • 형식: <strong className="font-mono bg-blue-100 px-1.5 py-0.5 rounded">이름,성별</strong><br />
+                  • 성별: <strong>남/여</strong> 또는 <strong>male/female</strong><br />
+                  • 성별 생략 시 이름만 추가됩니다
+                </div>
+              </div>
+            </div>
+          </div>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="bulkStudents">학생 이름 *</Label>
               <Textarea
                 id="bulkStudents"
-                placeholder="홍길동,남&#10;김영희,여&#10;박철수,남&#10;이순이,여"
+                placeholder={`홍길동,남
+김영희,여
+박철수,남
+이순이,여`}
                 value={bulkStudentNames}
                 onChange={(e) => setBulkStudentNames(e.target.value)}
                 rows={8}
-                className="resize-none"
+                className="resize-none font-mono"
               />
-              <p className="text-xs text-muted-foreground">
-                예시: "홍길동,남" 또는 "김영희,여" 또는 "박민수" (성별 생략 가능)
-              </p>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span>💡</span>
+                <span>
+                  예시: <code className="bg-gray-100 px-1.5 py-0.5 rounded">홍길동,남</code> 또는 <code className="bg-gray-100 px-1.5 py-0.5 rounded">김영희,여</code> 또는 <code className="bg-gray-100 px-1.5 py-0.5 rounded">박민수</code>
+                </span>
+              </div>
             </div>
           </div>
           <DialogFooter>

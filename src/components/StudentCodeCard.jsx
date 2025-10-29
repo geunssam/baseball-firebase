@@ -46,53 +46,62 @@ export default function StudentCodeCard({ student }) {
 
   return (
     <Card className="hover:shadow-lg transition-shadow">
-      <CardContent className="p-3">
+      <CardContent className="p-4">
         {student.studentCode ? (
-          <div className="space-y-2">
-            {/* 상단: 이름 + 버튼들 (가로 배치) */}
+          <div className="space-y-3">
+            {/* 상단: 이름 + 버튼 (한 줄 배치) */}
             <div className="flex items-center justify-between">
-              {/* 이모지 + 이름 (좌측) */}
-              <div className="flex items-center gap-1">
-                <span className="text-lg">
+              {/* 좌측: 이모지 + 이름 */}
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">
                   {student.gender === 'male' ? '👨‍🎓' : student.gender === 'female' ? '👩‍🎓' : '👨‍🎓'}
                 </span>
-                <span className="font-bold text-sm truncate">{student.name}</span>
+                <span className="font-bold text-base">{student.name}</span>
               </div>
 
-              {/* 버튼들 (우측 정렬) */}
+              {/* 우측: 버튼들 */}
               <div className="flex items-center gap-2">
-                {/* 복사 버튼 */}
                 <Button
                   onClick={handleCopy}
                   disabled={copying}
                   size="sm"
-                  className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700"
+                  className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 whitespace-nowrap"
+                  title="클립보드에 학생 코드 복사"
                 >
                   {copying ? '복사 중...' : '📋 코드 복사'}
                 </Button>
-
-                {/* 페이지 보기 버튼 */}
                 <Button
                   onClick={handleViewPage}
                   size="sm"
-                  className="text-xs bg-green-100 hover:bg-green-200 text-green-700"
+                  className="text-xs bg-green-100 hover:bg-green-200 text-green-700 whitespace-nowrap"
+                  title="학생 페이지 미리보기"
                 >
-                  👁️ 페이지 보기
+                  🔍 미리보기
                 </Button>
               </div>
             </div>
 
-            {/* 하단: 학생 코드 박스 (가로 한 줄) */}
-            <div className="bg-blue-50 p-3 rounded border border-blue-200 flex items-center justify-center gap-2">
-              <span className="text-xs text-gray-600">학생코드</span>
-              <span className="text-lg font-mono font-bold text-blue-600 select-all">
-                {student.studentCode}
-              </span>
+            {/* 하단: 학생 코드 박스 (줄바꿈 없이) */}
+            <div className="bg-blue-50 p-3 rounded-lg border-2 border-blue-200">
+              <div className="text-sm font-mono font-bold text-blue-600 select-all whitespace-nowrap overflow-x-auto">
+                학생코드: {student.studentCode}
+              </div>
             </div>
           </div>
         ) : (
-          <div className="bg-yellow-50 border-2 border-yellow-200 p-3 rounded-lg text-center">
-            <div className="text-yellow-600 text-sm">⚠️ 코드 없음</div>
+          <div className="space-y-3">
+            {/* 상단: 이름만 */}
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">
+                {student.gender === 'male' ? '👨‍🎓' : student.gender === 'female' ? '👩‍🎓' : '👨‍🎓'}
+              </span>
+              <span className="font-bold text-base">{student.name}</span>
+            </div>
+
+            {/* 하단: 코드 없음 경고 */}
+            <div className="bg-yellow-50 border-2 border-yellow-200 p-3 rounded-lg text-center">
+              <div className="text-yellow-600 text-sm">⚠️ 코드 없음</div>
+            </div>
           </div>
         )}
       </CardContent>
