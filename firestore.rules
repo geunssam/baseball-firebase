@@ -30,7 +30,10 @@ service cloud.firestore {
     match /{path=**}/finishedGames/{gameId} {
       allow read: if true;  // 학생이 경기 기록을 볼 수 있도록
     }
-
+    match /{path=**}/games/{gameId} {
+      allow read: if true;  // 학생이 진행 중인 경기를 볼 수 있도록
+    }
+    
     match /{path=**}/playerBadges/{playerId} {
       allow read: if true;  // 학생이 배지를 볼 수 있도록
     }

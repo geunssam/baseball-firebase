@@ -21,10 +21,18 @@ export default function StudentView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // 🔹 학생 데이터 로드
+  // 🔹 학생 데이터 로드 (1분마다 자동 갱신)
   useEffect(() => {
     if (studentData?.playerId) {
       loadStudentData();
+
+      // 1분(60초)마다 자동 갱신
+      const interval = setInterval(() => {
+        console.log('🔄 자동 갱신 중...');
+        loadStudentData();
+      }, 60000);
+
+      return () => clearInterval(interval);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentData?.playerId]);
@@ -62,6 +70,69 @@ export default function StudentView() {
           totalStats.total_good_defense += game.stats?.goodDefense || 0;
           totalStats.total_bonus_cookie += game.stats?.bonusCookie || 0;
         });
+      }
+
+      // 📌 진행 중인 경기에서 현재 스탯 추가 (새로 추가)
+      try {
+        const gamesRef = collection(db, 'users', studentData.teacherId, 'games');
+
+        // 🔍 디버깅: 모든 경기 먼저 확인
+        const allGamesSnapshot = await getDocs(gamesRef);
+        console.log('🔍 [DEBUG] 전체 경기 수:', allGamesSnapshot.size);
+        allGamesSnapshot.forEach(doc => {
+          const game = doc.data();
+          console.log('🔍 [DEBUG] 경기 ID:', doc.id, '/ Status:', game.status, '/ 팀:', game.teamA?.name, 'vs', game.teamB?.name);
+        });
+
+        const gamesQuery = query(gamesRef, where('status', '==', 'playing'));
+        const gamesSnapshot = await getDocs(gamesQuery);
+
+        console.log('🎮 진행 중인 경기 수:', gamesSnapshot.size);
+
+        gamesSnapshot.forEach(gameDoc => {
+          const game = gameDoc.data();
+
+          console.log('🔍 [DEBUG] 경기 처리 중:', gameDoc.id);
+          console.log('🔍 [DEBUG] 찾는 학생 playerId:', studentData.playerId);
+
+          // teamA와 teamB 라인업에서 해당 학생 찾기
+          const allPlayers = [
+            ...(game.teamA?.lineup || []),
+            ...(game.teamB?.lineup || [])
+          ];
+
+          console.log('🔍 [DEBUG] 전체 라인업 선수 수:', allPlayers.length);
+          allPlayers.forEach((p, idx) => {
+            console.log(`🔍 [DEBUG] 선수 ${idx}: id=${p.id}, playerId=${p.playerId}, name=${p.name}`);
+          });
+
+          const currentPlayer = allPlayers.find(
+            p => (p.id === studentData.playerId || p.playerId === studentData.playerId)
+          );
+
+          if (currentPlayer) {
+            console.log('✅ [DEBUG] 학생 찾음!', currentPlayer.name, '스탯:', currentPlayer.stats);
+          } else {
+            console.log('⚠️ [DEBUG] 학생을 라인업에서 찾지 못함!');
+          }
+
+          if (currentPlayer?.stats) {
+            // 진행 중인 경기 스탯 추가
+            totalStats.total_hits += currentPlayer.stats.hits || 0;
+            totalStats.total_runs += currentPlayer.stats.runs || 0;
+            totalStats.total_homeruns += currentPlayer.stats.homerun || 0;
+            totalStats.total_good_defense += currentPlayer.stats.goodDefense || 0;
+            totalStats.total_bonus_cookie += currentPlayer.stats.bonusCookie || 0;
+
+            console.log('✅ 진행 중인 경기 스탯 추가:', {
+              player: currentPlayer.name,
+              stats: currentPlayer.stats
+            });
+          }
+        });
+      } catch (error) {
+        console.warn('⚠️ 진행 중인 경기 조회 실패:', error);
+        // 에러가 나도 기존 스탯은 표시
       }
 
       setStats(totalStats);
@@ -133,14 +204,42 @@ export default function StudentView() {
             studentStats.total_good_defense += game.stats?.goodDefense || 0;
             studentStats.total_bonus_cookie += game.stats?.bonusCookie || 0;
           });
-
-          // 총점 계산 (안타 + 득점 + 수비 + 쿠키)
-          studentStats.total_points =
-            studentStats.total_hits +
-            studentStats.total_runs +
-            studentStats.total_good_defense +
-            studentStats.total_bonus_cookie;
         }
+
+        // 📌 진행 중인 경기 스탯도 추가 (우리 반 랭킹용)
+        try {
+          const activeGamesRef = collection(db, 'users', studentData.teacherId, 'games');
+          const activeGamesQuery = query(activeGamesRef, where('status', '==', 'playing'));
+          const activeGamesSnapshot = await getDocs(activeGamesQuery);
+
+          activeGamesSnapshot.forEach(gameDoc => {
+            const game = gameDoc.data();
+            const allPlayers = [
+              ...(game.teamA?.lineup || []),
+              ...(game.teamB?.lineup || [])
+            ];
+
+            const currentPlayer = allPlayers.find(
+              p => (p.id === (studentInfo.playerId || studentId) || p.playerId === (studentInfo.playerId || studentId))
+            );
+
+            if (currentPlayer?.stats) {
+              studentStats.total_hits += currentPlayer.stats.hits || 0;
+              studentStats.total_runs += currentPlayer.stats.runs || 0;
+              studentStats.total_good_defense += currentPlayer.stats.goodDefense || 0;
+              studentStats.total_bonus_cookie += currentPlayer.stats.bonusCookie || 0;
+            }
+          });
+        } catch (error) {
+          console.warn('⚠️ 반 랭킹: 진행 중인 경기 조회 실패 (학생:', studentInfo.name, '):', error);
+        }
+
+        // 총점 계산 (안타 + 득점 + 수비 + 쿠키)
+        studentStats.total_points =
+          studentStats.total_hits +
+          studentStats.total_runs +
+          studentStats.total_good_defense +
+          studentStats.total_bonus_cookie;
 
         rankingData.push(studentStats);
       }
@@ -206,16 +305,28 @@ export default function StudentView() {
                 {studentData.className}
               </p>
             </div>
-            <button
-              onClick={() => {
-                if (confirm('로그아웃하시겠습니까?')) {
-                  logout();
-                }
-              }}
-              className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition shadow-lg hover:shadow-xl"
-            >
-              로그아웃
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  console.log('🔄 수동 새로고침 시작');
+                  loadStudentData();
+                }}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition shadow-lg hover:shadow-xl flex items-center gap-2"
+                disabled={loading}
+              >
+                {loading ? '🔄 갱신 중...' : '🔄 새로고침'}
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm('로그아웃하시겠습니까?')) {
+                    logout();
+                  }
+                }}
+                className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition shadow-lg hover:shadow-xl"
+              >
+                로그아웃
+              </button>
+            </div>
           </div>
         </div>
 
