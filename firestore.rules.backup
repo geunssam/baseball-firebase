@@ -1,0 +1,111 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================
+    // 헬퍼 함수
+    // ============================================
+
+    // 로그인 확인
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // 데이터 소유자 확인
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // ============================================
+    // CollectionGroup 쿼리 지원 (학생 로그인용)
+    // ============================================
+
+    // 학생 코드로 로그인할 때 모든 users의 students 컬렉션 검색 허용
+    match /{path=**}/students/{studentId} {
+      allow read: if true;  // 학생 코드로 로그인하기 위해 collectionGroup 쿼리 허용
+    }
+
+    // 학생용 데이터 조회를 위한 collectionGroup 규칙들
+    match /{path=**}/finishedGames/{gameId} {
+      allow read: if true;  // 학생이 경기 기록을 볼 수 있도록
+    }
+
+    match /{path=**}/playerBadges/{playerId} {
+      allow read: if true;  // 학생이 배지를 볼 수 있도록
+    }
+
+    match /{path=**}/playerHistory/{playerId} {
+      allow read: if true;  // 학생이 기록을 볼 수 있도록
+    }
+
+    // ============================================
+    // 사용자별 데이터 (users 컬렉션)
+    // ============================================
+
+    match /users/{userId} {
+      // 프로필: 본인만 쓰기, 로그인한 사람은 읽기 가능 (교사 목록 표시용)
+      match /profile/{document=**} {
+        allow read: if isSignedIn();
+        allow write: if isOwner(userId);
+      }
+
+      // 학생 데이터: 소유자만 쓰기 (읽기는 위의 collectionGroup 규칙으로 처리됨)
+      match /students/{studentId} {
+        allow write: if isOwner(userId);
+      }
+
+      // 팀 데이터: 소유자만 읽기/쓰기 (간단 버전)
+      match /teams/{teamId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // 경기 데이터: 소유자만 읽기/쓰기
+      match /games/{gameId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // 종료된 경기: 소유자만 쓰기 (읽기는 collectionGroup 규칙으로 처리됨)
+      match /finishedGames/{gameId} {
+        allow write: if isOwner(userId);
+      }
+
+      // 선수 배지: 소유자만 쓰기 (읽기는 collectionGroup 규칙으로 처리됨)
+      match /playerBadges/{playerId} {
+        allow write: if isOwner(userId);
+      }
+
+      // 선수 히스토리: 소유자만 쓰기 (읽기는 collectionGroup 규칙으로 처리됨)
+      match /playerHistory/{playerId} {
+        allow write: if isOwner(userId);
+      }
+
+      // 설정
+      match /settings/{document=**} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // ============================================
+    // 권한 요청 시스템 (permissions 컬렉션)
+    // ============================================
+
+    match /permissions/{permissionId} {
+      // 권한 요청 생성: 로그인한 사람 누구나
+      allow create: if isSignedIn();
+
+      // 권한 요청 읽기: 요청자 또는 소유자
+      allow read: if isSignedIn() &&
+                     (resource.data.requesterId == request.auth.uid ||
+                      resource.data.ownerId == request.auth.uid);
+
+      // 권한 요청 승인/거부: 소유자만
+      allow update: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+
+      // 권한 요청 삭제: 요청자 또는 소유자
+      allow delete: if isSignedIn() &&
+                       (resource.data.requesterId == request.auth.uid ||
+                        resource.data.ownerId == request.auth.uid);
+    }
+  }
+}
