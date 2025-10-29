@@ -89,15 +89,15 @@ export default function StudentView() {
 
       setBadges(badgesWithDetails);
 
-      // 3️⃣ 반 랭킹 조회 (같은 className을 가진 학생들의 통계)
-      // Firebase는 collectionGroup을 사용해야 하지만, 여기서는 간단하게 같은 선생님의 학생들만 조회
-      const studentsRef = collection(db, 'students');
+      // 3️⃣ 반 랭킹 조회 (같은 선생님의 같은 반 학생들만)
+      const studentsRef = collection(db, 'users', studentData.teacherId, 'students');
       const studentsQuery = query(
         studentsRef,
-        where('className', '==', studentData.className),
-        where('ownerId', '==', studentData.teacherId)
+        where('className', '==', studentData.className)
       );
       const studentsSnapshot = await getDocs(studentsQuery);
+
+      console.log('🔍 StudentView: 반 학생 수:', studentsSnapshot.size);
 
       const classStudentIds = studentsSnapshot.docs.map(doc => doc.id);
 
