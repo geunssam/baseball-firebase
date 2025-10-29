@@ -435,22 +435,36 @@ export default function ClassTeamManagementView() {
     }
 
     try {
-      // 줄바꿈과 쉼표로 분리
-      const names = bulkStudentNames
-        .split(/[\n,]/)
-        .map(name => name.trim())
-        .filter(name => name.length > 0);
+      // 줄바꿈으로 학생 분리
+      const lines = bulkStudentNames
+        .split(/[\n]/)
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
 
-      if (names.length === 0) {
-        alert('유효한 학생 이름이 없습니다.');
+      if (lines.length === 0) {
+        alert('유효한 학생 정보가 없습니다.');
         return;
       }
 
       // 모든 학생을 순차적으로 추가
-      for (const name of names) {
+      for (const line of lines) {
+        // 이름,성별 형식으로 파싱
+        const parts = line.split(',').map(p => p.trim());
+        const name = parts[0];
+        const genderText = parts[1]?.toLowerCase(); // '남', '여', 'male', 'female'
+
+        // 성별 변환
+        let gender = null;
+        if (genderText === '남' || genderText === 'male' || genderText === 'm') {
+          gender = 'male';
+        } else if (genderText === '여' || genderText === 'female' || genderText === 'f') {
+          gender = 'female';
+        }
+
         await createStudent({
           name,
           className: targetClass,
+          gender,
         });
       }
 
@@ -1074,7 +1088,12 @@ export default function ClassTeamManagementView() {
                         onClick={() => toggleStudentSelection(student.id)}
                         className="w-full text-left"
                       >
-                        <div>{student.name}</div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm">
+                            {student.gender === 'male' ? '👨‍🎓' : student.gender === 'female' ? '👩‍🎓' : '👨‍🎓'}
+                          </span>
+                          <span>{student.name}</span>
+                        </div>
                         {student.studentCode && (
                           <div className="mt-1 flex items-center gap-1">
                             <span className="text-[10px] text-muted-foreground font-mono">
@@ -1094,6 +1113,19 @@ export default function ClassTeamManagementView() {
                           </div>
                         )}
                       </button>
+                      {isClassEditMode && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const newGender = student.gender === 'male' ? 'female' : 'male';
+                            updateStudent(student.id, { gender: newGender });
+                          }}
+                          className="mt-1 text-[10px] px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 rounded text-blue-700 transition-colors"
+                          title="성별 변경"
+                        >
+                          {student.gender === 'male' ? '👨→👩' : '👩→👨'}
+                        </button>
+                      )}
                       {isClassEditMode && (
                         <button
                           onClick={(e) => {
@@ -1374,7 +1406,9 @@ export default function ClassTeamManagementView() {
           <DialogHeader>
             <DialogTitle>{targetClass} - 학생 추가</DialogTitle>
             <DialogDescription>
-              학생 이름을 입력하세요. 줄바꿈(Enter) 또는 쉼표(,)로 구분하여 여러 명을 한 번에 추가할 수 있습니다.
+              한 줄에 한 명씩 입력하세요. (형식: 이름,성별)<br />
+              성별은 '남/여' 또는 'male/female'로 입력 가능합니다.<br />
+              성별을 생략하면 이름만 추가됩니다.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1382,14 +1416,14 @@ export default function ClassTeamManagementView() {
               <Label htmlFor="bulkStudents">학생 이름 *</Label>
               <Textarea
                 id="bulkStudents"
-                placeholder="홍길동&#10;김철수, 이영희&#10;박민수"
+                placeholder="홍길동,남&#10;김영희,여&#10;박철수,남&#10;이순이,여"
                 value={bulkStudentNames}
                 onChange={(e) => setBulkStudentNames(e.target.value)}
                 rows={8}
                 className="resize-none"
               />
               <p className="text-xs text-muted-foreground">
-                예시: "홍길동" 또는 "김철수, 이영희" 또는 줄바꿈으로 구분
+                예시: "홍길동,남" 또는 "김영희,여" 또는 "박민수" (성별 생략 가능)
               </p>
             </div>
           </div>

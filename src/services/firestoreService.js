@@ -240,6 +240,7 @@ class FirestoreService {
         ownerId: userId,
         playerId: newStudentRef.id, // playerId = studentId (stats 조회용)
         studentCode, // 학생 로그인 코드
+        gender: studentData.gender || null, // 성별: 'male', 'female', null
         createdAt: serverTimestamp(),
       };
 

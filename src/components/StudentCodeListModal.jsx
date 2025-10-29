@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Alert } from './ui/alert';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import StudentCodeCard from './StudentCodeCard';
 import { useGame } from '../contexts/GameContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,6 +14,7 @@ export default function StudentCodeListModal({ open, onOpenChange }) {
   const { user } = useAuth();
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [expandedClasses, setExpandedClasses] = useState({}); // 학급별 펼침 상태
 
   // 학급별로 학생 그룹화
   const studentsByClass = useMemo(() => {
@@ -150,31 +152,55 @@ export default function StudentCodeListModal({ open, onOpenChange }) {
         )}
 
         {/* 학급별 학생 목록 */}
-        <div className="space-y-8">
-          {Object.keys(studentsByClass).sort().map(className => (
-            <div key={className}>
-              {/* 학급 헤더 */}
-              <div className="flex items-center justify-between mb-4 pb-2 border-b-2">
-                <h3 className="text-lg font-bold">
-                  📚 {className} ({studentsByClass[className].length}명)
-                </h3>
-                <Button
-                  onClick={() => handleCopyAllCodes(className)}
-                  variant="outline"
-                  size="sm"
-                >
-                  📋 전체 코드 복사
-                </Button>
-              </div>
+        <div className="space-y-4">
+          {Object.keys(studentsByClass).sort().map(className => {
+            const isExpanded = expandedClasses[className] !== false; // 기본값 true (펼침)
 
-              {/* 학생 카드 그리드 (3열) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {studentsByClass[className].map(student => (
-                  <StudentCodeCard key={student.id} student={student} />
-                ))}
+            return (
+              <div key={className} className="border rounded-lg overflow-hidden">
+                {/* 학급 헤더 (클릭 가능) */}
+                <div className="flex items-center justify-between p-4 bg-muted/50 hover:bg-muted transition-colors">
+                  <button
+                    onClick={() => {
+                      setExpandedClasses(prev => ({
+                        ...prev,
+                        [className]: !isExpanded
+                      }));
+                    }}
+                    className="flex items-center gap-2 flex-1 text-left"
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="w-5 h-5" />
+                    ) : (
+                      <ChevronUp className="w-5 h-5" />
+                    )}
+                    <h3 className="text-lg font-bold">
+                      📚 {className} ({studentsByClass[className].length}명)
+                    </h3>
+                  </button>
+
+                  <Button
+                    onClick={() => handleCopyAllCodes(className)}
+                    variant="outline"
+                    size="sm"
+                  >
+                    📋 전체 코드 복사
+                  </Button>
+                </div>
+
+                {/* 학생 카드 그리드 (3열) - 펼쳐졌을 때만 표시 */}
+                {isExpanded && (
+                  <div className="p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {studentsByClass[className].map(student => (
+                        <StudentCodeCard key={student.id} student={student} />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {/* 학생이 없을 때 */}
           {students.length === 0 && (

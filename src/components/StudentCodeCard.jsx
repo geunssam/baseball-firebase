@@ -2,9 +2,19 @@ import { useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import toast from 'react-hot-toast';
+import { useStudentAuth } from '../contexts/StudentAuthContext';
 
 export default function StudentCodeCard({ student }) {
   const [copying, setCopying] = useState(false);
+  const { loginWithStudentCode } = useStudentAuth();
+
+  const handleViewPage = () => {
+    if (!student.studentCode) {
+      toast.error('학생 코드가 없습니다.');
+      return;
+    }
+    loginWithStudentCode(student.studentCode);
+  };
 
   const handleCopy = async () => {
     if (!student.studentCode) {
@@ -36,40 +46,55 @@ export default function StudentCodeCard({ student }) {
 
   return (
     <Card className="hover:shadow-lg transition-shadow">
-      <CardContent className="p-4">
-        <div className="space-y-3">
-          {/* 학생 정보 */}
-          <div className="text-center">
-            <div className="text-2xl mb-1">👨‍🎓</div>
-            <div className="font-bold text-base">{student.name}</div>
-            <div className="text-xs text-muted-foreground">{student.className || '학급 정보 없음'}</div>
-          </div>
-
-          {/* 학생 코드 */}
-          {student.studentCode ? (
-            <>
-              <div className="bg-blue-50 p-3 rounded-lg border-2 border-blue-200">
-                <div className="text-xs text-gray-600 text-center mb-1">학생 로그인 코드</div>
-                <div className="text-2xl font-mono font-bold text-center text-blue-600 select-all">
-                  {student.studentCode}
-                </div>
+      <CardContent className="p-3">
+        {student.studentCode ? (
+          <div className="space-y-2">
+            {/* 상단: 이름 + 버튼들 (가로 배치) */}
+            <div className="flex items-center justify-between">
+              {/* 이모지 + 이름 (좌측) */}
+              <div className="flex items-center gap-1">
+                <span className="text-lg">
+                  {student.gender === 'male' ? '👨‍🎓' : student.gender === 'female' ? '👩‍🎓' : '👨‍🎓'}
+                </span>
+                <span className="font-bold text-sm truncate">{student.name}</span>
               </div>
 
-              {/* 복사 버튼 */}
-              <Button
-                onClick={handleCopy}
-                disabled={copying}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white"
-              >
-                {copying ? '복사 중...' : '📋 코드 복사'}
-              </Button>
-            </>
-          ) : (
-            <div className="bg-yellow-50 border-2 border-yellow-200 p-3 rounded-lg text-center">
-              <div className="text-yellow-600 text-sm">⚠️ 코드 없음</div>
+              {/* 버튼들 (우측 정렬) */}
+              <div className="flex items-center gap-2">
+                {/* 복사 버튼 */}
+                <Button
+                  onClick={handleCopy}
+                  disabled={copying}
+                  size="sm"
+                  className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700"
+                >
+                  {copying ? '복사 중...' : '📋 코드 복사'}
+                </Button>
+
+                {/* 페이지 보기 버튼 */}
+                <Button
+                  onClick={handleViewPage}
+                  size="sm"
+                  className="text-xs bg-green-100 hover:bg-green-200 text-green-700"
+                >
+                  👁️ 페이지 보기
+                </Button>
+              </div>
             </div>
-          )}
-        </div>
+
+            {/* 하단: 학생 코드 박스 (가로 한 줄) */}
+            <div className="bg-blue-50 p-3 rounded border border-blue-200 flex items-center justify-center gap-2">
+              <span className="text-xs text-gray-600">학생코드</span>
+              <span className="text-lg font-mono font-bold text-blue-600 select-all">
+                {student.studentCode}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-yellow-50 border-2 border-yellow-200 p-3 rounded-lg text-center">
+            <div className="text-yellow-600 text-sm">⚠️ 코드 없음</div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -336,8 +336,7 @@ const MainApp = () => {
                 size="sm"
                 className="bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-200 text-xs tablet:text-sm"
               >
-                <span className="hidden tablet:inline">🔑 학생 코드</span>
-                <span className="tablet:hidden">🔑</span>
+                📋 학생코드
               </Button>
               <Button onClick={signOut} size="sm" className="bg-red-100 hover:bg-red-200 text-red-700 border-red-200 text-xs tablet:text-sm">
                 로그아웃
