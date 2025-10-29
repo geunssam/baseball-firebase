@@ -39,7 +39,7 @@ const SortableAttackRow = ({ player, index, isCurrentBatter, currentInning, chil
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    height: '47px',
+    height: '50px',
   };
 
   return (
@@ -1631,8 +1631,8 @@ const GameScreen = ({ gameId, onExit }) => {
 
       {/* 메인 콘텐츠 */}
       <main className="flex-1 flex flex-col overflow-hidden py-2 px-4 max-w-7xl mx-auto w-full">
-        {/* 스코어보드 + 진루상황 (38% 높이) */}
-        <div className="flex-[0_0_38%] grid grid-cols-1 lg:grid-cols-10 gap-3 mb-2">
+        {/* 스코어보드 + 진루상황 (28% 높이) */}
+        <div className="flex-[0_0_28%] grid grid-cols-1 lg:grid-cols-10 gap-3 mb-2">
           {/* 스코어보드 (8) */}
           <div className="lg:col-span-8 flex flex-col">
             <Card className="flex-1 flex flex-col overflow-hidden bg-white shadow-lg">
@@ -1653,13 +1653,13 @@ const GameScreen = ({ gameId, onExit }) => {
                 </button>
 
                 {/* 중앙: 회차 + 공격팀 */}
-                <div className="flex items-center gap-4">
-                  <div className="text-2xl font-bold text-blue-600">
+                <div className="flex items-center gap-3">
+                  <div className="text-xl tablet:text-2xl font-bold text-blue-600">
                     {game.currentInning}회 {game.isTopInning ? '초' : '말'}
                   </div>
-                  <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-4 py-1.5 rounded-lg font-bold shadow-lg flex items-center gap-2">
-                    <span>⚔️ 공격</span>
-                    <span className="text-lg">{attackTeam.name}</span>
+                  <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-3 py-1 rounded-lg font-bold shadow-lg flex items-center gap-1.5">
+                    <span className="text-sm">⚔️</span>
+                    <span className="text-base">{attackTeam.name}</span>
                   </div>
                 </div>
 
@@ -1775,13 +1775,13 @@ const GameScreen = ({ gameId, onExit }) => {
                       <table className="w-full text-center border-collapse rounded-lg overflow-hidden shadow-lg">
                         <thead>
                           <tr className="bg-gradient-to-r from-sky-100 to-blue-100">
-                            <th className="border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 font-bold text-2xl tablet:text-3xl tablet-lg:text-4xl">팀</th>
+                            <th className="border border-gray-300 p-1 tablet:p-1.5 tablet-lg:p-2 font-bold text-lg tablet:text-xl tablet-lg:text-2xl">팀</th>
                             {visibleInnings.map((inningIndex) => {
                               const isCurrentInning = inningIndex + 1 === game.currentInning;
                               return (
                                 <th
                                   key={inningIndex}
-                                  className={`border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 text-2xl tablet:text-3xl tablet-lg:text-4xl transition-all ${
+                                  className={`border border-gray-300 p-1 tablet:p-1.5 tablet-lg:p-2 text-lg tablet:text-xl tablet-lg:text-2xl transition-all ${
                                     isCurrentInning
                                       ? 'bg-gradient-to-br from-blue-400 to-blue-500 text-white font-bold shadow-inner'
                                       : 'hover:bg-blue-50'
@@ -1789,12 +1789,12 @@ const GameScreen = ({ gameId, onExit }) => {
                                 >
                                   {inningIndex + 1}회
                                   {isCurrentInning && (
-                                    <span className="ml-2 inline-block animate-pulse">🔴</span>
+                                    <span className="ml-1 inline-block animate-pulse text-sm">🔴</span>
                                   )}
                                 </th>
                               );
                             })}
-                            <th className="border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 bg-gradient-to-r from-yellow-100 to-amber-100 font-bold text-2xl tablet:text-3xl tablet-lg:text-4xl">
+                            <th className="border border-gray-300 p-1 tablet:p-1.5 tablet-lg:p-2 bg-gradient-to-r from-yellow-100 to-amber-100 font-bold text-lg tablet:text-xl tablet-lg:text-2xl">
                               총점
                             </th>
                           </tr>
@@ -1802,10 +1802,10 @@ const GameScreen = ({ gameId, onExit }) => {
                         <tbody>
                           {/* TeamA Row */}
                           <tr className={`transition-all ${game.isTopInning ? 'bg-gradient-to-r from-blue-50 to-sky-50' : 'hover:bg-gray-50'}`}>
-                            <td className="border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 font-semibold text-2xl tablet:text-3xl tablet-lg:text-4xl">
+                            <td className="border border-gray-300 p-1 tablet:p-1.5 tablet-lg:p-2 font-semibold text-lg tablet:text-xl tablet-lg:text-2xl">
                               {game.teamA.name}
                               {game.isTopInning && (
-                                <span className="ml-2 tablet:ml-3 text-red-500 font-bold text-xl tablet:text-2xl">⚔️</span>
+                                <span className="ml-1 tablet:ml-2 text-red-500 font-bold text-base tablet:text-lg">⚔️</span>
                               )}
                             </td>
                             {visibleInnings.map((inningIndex) => {
@@ -1814,27 +1814,27 @@ const GameScreen = ({ gameId, onExit }) => {
                               return (
                                 <td
                                   key={inningIndex}
-                                  className={`border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 transition-all ${
+                                  className={`border border-gray-300 p-1 tablet:p-1.5 tablet-lg:p-2 transition-all ${
                                     hasScore ? 'bg-yellow-50 font-extrabold' : ''
                                   }`}
                                 >
-                                  <span className={`text-4xl tablet:text-5xl tablet-lg:text-6xl ${hasScore ? 'text-orange-600' : 'text-gray-400'}`}>
+                                  <span className={`text-3xl tablet:text-4xl tablet-lg:text-5xl ${hasScore ? 'text-orange-600' : 'text-gray-400'}`}>
                                     {score}
                                   </span>
                                   {/* 득점 이닝 시각적 표시 */}
                                   {hasScore && (
-                                    <div className="mt-2 flex justify-center gap-1">
+                                    <div className="mt-1 flex justify-center gap-0.5">
                                       {Array.from({ length: Math.min(score, 3) }).map((_, i) => (
-                                        <span key={i} className="text-lg">⭐</span>
+                                        <span key={i} className="text-sm">⭐</span>
                                       ))}
-                                      {score > 3 && <span className="text-lg">+{score - 3}</span>}
+                                      {score > 3 && <span className="text-sm">+{score - 3}</span>}
                                     </div>
                                   )}
                                 </td>
                               );
                             })}
-                            <td className="border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 bg-gradient-to-r from-yellow-50 to-amber-50">
-                              <div className="text-5xl tablet:text-6xl tablet-lg:text-7xl font-bold text-blue-600">
+                            <td className="border border-gray-300 p-1 tablet:p-1.5 tablet-lg:p-2 bg-gradient-to-r from-yellow-50 to-amber-50">
+                              <div className="text-4xl tablet:text-5xl tablet-lg:text-6xl font-bold text-blue-600">
                                 {game.scoreBoard.teamATotal}
                               </div>
                             </td>
@@ -1842,10 +1842,10 @@ const GameScreen = ({ gameId, onExit }) => {
 
                           {/* TeamB Row */}
                           <tr className={`transition-all ${!game.isTopInning ? 'bg-gradient-to-r from-red-50 to-pink-50' : 'hover:bg-gray-50'}`}>
-                            <td className="border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 font-semibold text-2xl tablet:text-3xl tablet-lg:text-4xl">
+                            <td className="border border-gray-300 p-1 tablet:p-1.5 tablet-lg:p-2 font-semibold text-lg tablet:text-xl tablet-lg:text-2xl">
                               {game.teamB.name}
                               {!game.isTopInning && (
-                                <span className="ml-2 tablet:ml-3 text-red-500 font-bold text-xl tablet:text-2xl">⚔️</span>
+                                <span className="ml-1 tablet:ml-2 text-red-500 font-bold text-base tablet:text-lg">⚔️</span>
                               )}
                             </td>
                             {visibleInnings.map((inningIndex) => {
@@ -1854,27 +1854,27 @@ const GameScreen = ({ gameId, onExit }) => {
                               return (
                                 <td
                                   key={inningIndex}
-                                  className={`border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 transition-all ${
+                                  className={`border border-gray-300 p-1 tablet:p-1.5 tablet-lg:p-2 transition-all ${
                                     hasScore ? 'bg-yellow-50 font-extrabold' : ''
                                   }`}
                                 >
-                                  <span className={`text-4xl tablet:text-5xl tablet-lg:text-6xl ${hasScore ? 'text-orange-600' : 'text-gray-400'}`}>
+                                  <span className={`text-3xl tablet:text-4xl tablet-lg:text-5xl ${hasScore ? 'text-orange-600' : 'text-gray-400'}`}>
                                     {score}
                                   </span>
                                   {/* 득점 이닝 시각적 표시 */}
                                   {hasScore && (
-                                    <div className="mt-2 flex justify-center gap-1">
+                                    <div className="mt-1 flex justify-center gap-0.5">
                                       {Array.from({ length: Math.min(score, 3) }).map((_, i) => (
-                                        <span key={i} className="text-lg">⭐</span>
+                                        <span key={i} className="text-sm">⭐</span>
                                       ))}
-                                      {score > 3 && <span className="text-lg">+{score - 3}</span>}
+                                      {score > 3 && <span className="text-sm">+{score - 3}</span>}
                                     </div>
                                   )}
                                 </td>
                               );
                             })}
-                            <td className="border border-gray-300 p-2 tablet:p-3 tablet-lg:p-4 bg-gradient-to-r from-yellow-50 to-amber-50">
-                              <div className="text-5xl tablet:text-6xl tablet-lg:text-7xl font-bold text-red-600">
+                            <td className="border border-gray-300 p-1 tablet:p-1.5 tablet-lg:p-2 bg-gradient-to-r from-yellow-50 to-amber-50">
+                              <div className="text-4xl tablet:text-5xl tablet-lg:text-6xl font-bold text-red-600">
                                 {game.scoreBoard.teamBTotal}
                               </div>
                             </td>
@@ -1963,8 +1963,8 @@ const GameScreen = ({ gameId, onExit }) => {
                   <div
                     className="relative bg-gradient-to-br from-green-600 to-green-800 rounded-lg shadow-lg overflow-visible"
                     style={{
-                      width: '180px',
-                      height: '180px'
+                      width: '140px',
+                      height: '140px'
                     }}
                   >
                     {/* 내야 흙색 영역 */}
@@ -1990,7 +1990,7 @@ const GameScreen = ({ gameId, onExit }) => {
 
                     {/* 2루 (상단) */}
                     <div
-                      className={`absolute w-8 h-8 transform transition-all shadow-xl border-2 border-white ${
+                      className={`absolute w-6 h-6 transform transition-all shadow-xl border-2 border-white ${
                         game.runners?.second
                           ? 'bg-yellow-400 scale-110'
                           : 'bg-gray-100'
@@ -2009,7 +2009,7 @@ const GameScreen = ({ gameId, onExit }) => {
 
                     {/* 3루 (좌측) */}
                     <div
-                      className={`absolute w-8 h-8 transform transition-all shadow-xl border-2 border-white ${
+                      className={`absolute w-6 h-6 transform transition-all shadow-xl border-2 border-white ${
                         game.runners?.third
                           ? 'bg-yellow-400 scale-110'
                           : 'bg-gray-100'
@@ -2028,7 +2028,7 @@ const GameScreen = ({ gameId, onExit }) => {
 
                     {/* 1루 (우측) */}
                     <div
-                      className={`absolute w-8 h-8 transform transition-all shadow-xl border-2 border-white ${
+                      className={`absolute w-6 h-6 transform transition-all shadow-xl border-2 border-white ${
                         game.runners?.first
                           ? 'bg-yellow-400 scale-110'
                           : 'bg-gray-100'
@@ -2047,7 +2047,7 @@ const GameScreen = ({ gameId, onExit }) => {
 
                     {/* 홈베이스 */}
                     <div
-                      className="absolute w-8 h-8 bg-white transform shadow-xl border-2 border-white z-10"
+                      className="absolute w-6 h-6 bg-white transform shadow-xl border-2 border-white z-10"
                       style={{
                         top: '85%',
                         left: '50%',
@@ -2064,8 +2064,8 @@ const GameScreen = ({ gameId, onExit }) => {
 
                 {/* 주자 이름 표시 + 수동 조정 */}
                 {(game.runners?.first || game.runners?.second || game.runners?.third) && (
-                  <div className="w-full px-1 mt-1">
-                    <div className="flex gap-1 text-[9px] flex-wrap">
+                  <div className="w-full px-0.5 mt-0.5">
+                    <div className="flex gap-0.5 text-[8px] flex-wrap">
                       {game.runners?.third && (
                         <div className="flex items-center gap-1 bg-yellow-100 px-1.5 py-0.5 rounded border border-yellow-300 flex-shrink-0">
                           <span className="font-semibold text-yellow-800 text-[10px] truncate max-w-[60px]">
@@ -2142,23 +2142,23 @@ const GameScreen = ({ gameId, onExit }) => {
                 )}
 
                 {/* 카운트 (아웃 + 스트라이크) */}
-                <div className="w-full px-1 space-y-1 mt-2">
+                <div className="w-full px-0.5 space-y-0.5 mt-1">
                   {/* 아웃 카운트 (game.options.outs가 true일 때만 표시) */}
                   {game.options?.outs && (
-                    <div className="flex items-center justify-between bg-white rounded-lg p-1 shadow-sm border border-gray-200">
-                      <span className="font-bold text-gray-700 text-xs ml-1">아웃</span>
-                      <div className="flex items-center gap-1">
+                    <div className="flex items-center justify-between bg-white rounded p-0.5 shadow-sm border border-gray-200">
+                      <span className="font-bold text-gray-700 text-[10px] ml-0.5">O</span>
+                      <div className="flex items-center gap-0.5">
                         <button
                           onClick={() => handleChangeOuts(-1)}
-                          className="w-6 h-6 rounded bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold text-xs transition flex items-center justify-center"
+                          className="w-5 h-5 rounded bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold text-[10px] transition flex items-center justify-center"
                         >
                           -
                         </button>
-                        <div className="flex gap-1">
+                        <div className="flex gap-0.5">
                           {[0, 1, 2, 3].map((n) => (
                             <div
                               key={n}
-                              className={`w-6 h-6 rounded flex items-center justify-center font-bold text-xs ${
+                              className={`w-5 h-5 rounded flex items-center justify-center font-bold text-[10px] ${
                                 (game.currentOuts || 0) === n
                                   ? 'bg-red-500 text-white'
                                   : 'bg-gray-100 text-gray-400'
@@ -2170,7 +2170,7 @@ const GameScreen = ({ gameId, onExit }) => {
                         </div>
                         <button
                           onClick={() => handleChangeOuts(1)}
-                          className="w-6 h-6 rounded bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold text-xs transition flex items-center justify-center"
+                          className="w-5 h-5 rounded bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold text-[10px] transition flex items-center justify-center"
                         >
                           +
                         </button>
@@ -2179,20 +2179,20 @@ const GameScreen = ({ gameId, onExit }) => {
                   )}
 
                   {/* 스트라이크 카운트 */}
-                  <div className="flex items-center justify-between bg-white rounded-lg p-1 shadow-sm border border-gray-200">
-                    <span className="font-bold text-gray-700 text-xs ml-1">S</span>
-                    <div className="flex items-center gap-1">
+                  <div className="flex items-center justify-between bg-white rounded p-0.5 shadow-sm border border-gray-200">
+                    <span className="font-bold text-gray-700 text-[10px] ml-0.5">S</span>
+                    <div className="flex items-center gap-0.5">
                       <button
                         onClick={() => handleChangeStrikes(-1)}
-                        className="w-6 h-6 rounded bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold text-xs transition flex items-center justify-center"
+                        className="w-5 h-5 rounded bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold text-[10px] transition flex items-center justify-center"
                       >
                         -
                       </button>
-                      <div className="flex gap-1">
+                      <div className="flex gap-0.5">
                         {[0, 1, 2].map((n) => (
                           <div
                             key={n}
-                            className={`w-6 h-6 rounded flex items-center justify-center font-bold text-xs ${
+                            className={`w-5 h-5 rounded flex items-center justify-center font-bold text-[10px] ${
                               (game.currentStrikes || 0) === n
                                 ? 'bg-yellow-500 text-white'
                                 : 'bg-gray-100 text-gray-400'
@@ -2204,7 +2204,7 @@ const GameScreen = ({ gameId, onExit }) => {
                       </div>
                       <button
                         onClick={() => handleChangeStrikes(1)}
-                        className="w-6 h-6 rounded bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold text-xs transition flex items-center justify-center"
+                        className="w-5 h-5 rounded bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold text-[10px] transition flex items-center justify-center"
                       >
                         +
                       </button>
@@ -2218,7 +2218,7 @@ const GameScreen = ({ gameId, onExit }) => {
             </div>
           </div>
 
-        {/* 공격팀/수비팀 라인업 (58% 높이) */}
+        {/* 공격팀/수비팀 라인업 (72% 높이) */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-3 min-h-0">
           {/* 공격팀 */}
           <Card className="flex flex-col overflow-hidden bg-red-50/30 border-red-100">
@@ -2262,7 +2262,8 @@ const GameScreen = ({ gameId, onExit }) => {
                   </DropdownMenu>
                 </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-auto min-h-0 p-2">
+            <CardContent className="flex-1 flex flex-col min-h-0 p-2">
+              <div className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100% - 0px)' }}>
               <table className="w-full text-sm table-fixed">
                   <colgroup>
                     <col style={{ width: '12%' }} />
@@ -2271,13 +2272,13 @@ const GameScreen = ({ gameId, onExit }) => {
                     <col style={{ width: '20%' }} />
                     <col style={{ width: '20%' }} />
                   </colgroup>
-                  <thead>
+                  <thead className="sticky top-0 bg-white z-10 shadow-sm">
                     <tr className="border-b-2 border-black">
-                      <th className="text-center py-2" style={{ textAlign: 'center' }}>타순</th>
-                      <th className="text-left py-2 pl-2" style={{ textAlign: 'left' }}>이름</th>
-                      <th className="text-center py-2" style={{ textAlign: 'center' }}>⚾ 안타</th>
-                      <th className="text-center py-2" style={{ textAlign: 'center' }}>🏃 득점</th>
-                      <th className="text-center py-2" style={{ textAlign: 'center' }}>🍪 쿠키</th>
+                      <th className="text-center py-2 bg-white" style={{ textAlign: 'center' }}>타순</th>
+                      <th className="text-left py-2 pl-2 bg-white" style={{ textAlign: 'left' }}>이름</th>
+                      <th className="text-center py-2 bg-white" style={{ textAlign: 'center' }}>⚾ 안타</th>
+                      <th className="text-center py-2 bg-white" style={{ textAlign: 'center' }}>🏃 득점</th>
+                      <th className="text-center py-2 bg-white" style={{ textAlign: 'center' }}>🍪 쿠키</th>
                     </tr>
                   </thead>
                   <DndContext
@@ -2386,7 +2387,7 @@ const GameScreen = ({ gameId, onExit }) => {
                                     : 'hover:bg-red-50'
                                   }
                                 `}
-                                style={{ height: '47px' }}
+                                style={{ height: '50px' }}
                               >
                                 <td className="py-2 align-middle text-center">
                                   <div className="flex items-center justify-center gap-1">
@@ -2649,6 +2650,7 @@ const GameScreen = ({ gameId, onExit }) => {
                     </SortableContext>
                   </DndContext>
                 </table>
+              </div>
               </CardContent>
             </Card>
 
@@ -2676,7 +2678,8 @@ const GameScreen = ({ gameId, onExit }) => {
                   </DropdownMenu>
                 </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-auto min-h-0 p-2">
+            <CardContent className="flex-1 flex flex-col min-h-0 p-2">
+              <div className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100% - 0px)' }}>
               <table className="w-full text-sm table-fixed">
                   <colgroup>
                     <col style={{ width: '18%' }} />
@@ -2684,17 +2687,17 @@ const GameScreen = ({ gameId, onExit }) => {
                     <col style={{ width: '25%' }} />
                     <col style={{ width: '25%' }} />
                   </colgroup>
-                  <thead>
+                  <thead className="sticky top-0 bg-white z-10 shadow-sm">
                     <tr className="border-b-2 border-black">
-                      <th className="text-center py-2">포지션</th>
-                      <th className="text-center py-2">이름</th>
-                      <th className="text-center py-2">🛡️ 수비</th>
-                      <th className="text-center py-2">🍪 쿠키</th>
+                      <th className="text-center py-2 bg-white">포지션</th>
+                      <th className="text-center py-2 bg-white">이름</th>
+                      <th className="text-center py-2 bg-white">🛡️ 수비</th>
+                      <th className="text-center py-2 bg-white">🍪 쿠키</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(tempDefenseLineup || defenseTeam.lineup).map((player, i) => (
-                      <tr key={i} className="border-b-2 border-black py-4 hover:bg-blue-50" style={{ height: '47px' }}>
+                      <tr key={i} className="border-b-2 border-black py-4 hover:bg-blue-50" style={{ height: '50px' }}>
                         {/* 포지션 */}
                         <td className="py-2 align-middle text-center">
                           {isDefenseEditMode ? (
@@ -2877,6 +2880,7 @@ const GameScreen = ({ gameId, onExit }) => {
                     ))}
                   </tbody>
                 </table>
+              </div>
               </CardContent>
             </Card>
         </div>

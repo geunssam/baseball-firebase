@@ -1,13 +1,18 @@
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { StudentAuthProvider, useStudentAuth } from './contexts/StudentAuthContext';
 import { GameProvider } from './contexts/GameContext';
-import LoginPage from './components/auth/LoginPage';
+import UnifiedLoginPage from './components/auth/UnifiedLoginPage';
 import MainApp from './components/MainApp';
+import StudentView from './components/StudentView';
+import { Toaster } from 'react-hot-toast';
 import './index.css';
 
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user: teacherUser, loading: teacherLoading } = useAuth();
+  const { studentData, loading: studentLoading } = useStudentAuth();
 
-  if (loading) {
+  // 둘 다 로딩 중이면 로딩 화면 표시
+  if (teacherLoading || studentLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600">
         <div className="text-center">
@@ -18,19 +23,29 @@ function AppContent() {
     );
   }
 
-  if (!user) {
-    return <LoginPage />;
+  // 학생으로 로그인한 경우
+  if (studentData) {
+    return <StudentView />;
   }
 
-  return <MainApp />;
+  // 교사로 로그인한 경우
+  if (teacherUser) {
+    return <MainApp />;
+  }
+
+  // 로그인 안 한 경우 통합 로그인 페이지 표시
+  return <UnifiedLoginPage />;
 }
 
 function App() {
   return (
     <AuthProvider>
-      <GameProvider>
-        <AppContent />
-      </GameProvider>
+      <StudentAuthProvider>
+        <GameProvider>
+          <Toaster position="top-right" />
+          <AppContent />
+        </GameProvider>
+      </StudentAuthProvider>
     </AuthProvider>
   );
 }

@@ -231,14 +231,20 @@ class FirestoreService {
       const studentsRef = this.getUserCollection('students');
       const newStudentRef = doc(studentsRef);
 
+      // 학생 코드 생성: teacherId(앞 6자리) + studentId(뒤 6자리)
+      const { generateStudentCode } = await import('../utils/studentCodeGenerator.js');
+      const studentCode = generateStudentCode(userId, newStudentRef.id);
+
       const student = {
         ...studentData,
         ownerId: userId,
+        playerId: newStudentRef.id, // playerId = studentId (stats 조회용)
+        studentCode, // 학생 로그인 코드
         createdAt: serverTimestamp(),
       };
 
       await setDoc(newStudentRef, student);
-      console.log('✅ 학생 생성 완료:', newStudentRef.id);
+      console.log('✅ 학생 생성 완료:', newStudentRef.id, '학생 코드:', studentCode);
       return newStudentRef.id;
     } catch (error) {
       console.error('❌ 학생 생성 실패:', error);

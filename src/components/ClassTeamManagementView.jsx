@@ -1074,7 +1074,25 @@ export default function ClassTeamManagementView() {
                         onClick={() => toggleStudentSelection(student.id)}
                         className="w-full text-left"
                       >
-                        {student.name}
+                        <div>{student.name}</div>
+                        {student.studentCode && (
+                          <div className="mt-1 flex items-center gap-1">
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              {student.studentCode}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(student.studentCode);
+                                alert(`${student.name}의 코드가 복사되었습니다!\n코드: ${student.studentCode}`);
+                              }}
+                              className="text-[10px] text-blue-500 hover:text-blue-700"
+                              title="코드 복사"
+                            >
+                              📋
+                            </button>
+                          </div>
+                        )}
                       </button>
                       {isClassEditMode && (
                         <button

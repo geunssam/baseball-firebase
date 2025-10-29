@@ -15,6 +15,7 @@ import GameScreen from './GameScreen';
 import ClassTeamManagementView from './ClassTeamManagementView';
 import BadgeCollection from './BadgeCollection';
 import StatsView from './StatsView';
+import StudentCodeListModal from './StudentCodeListModal';
 import { useModalKeyboard } from '../hooks/useKeyboardShortcut';
 
 const MainApp = () => {
@@ -41,6 +42,9 @@ const MainApp = () => {
 
   // 완료된 경기 다중 선택 상태
   const [selectedCompletedGames, setSelectedCompletedGames] = useState([]);
+
+  // 학생 코드 모달 상태
+  const [showStudentCodeModal, setShowStudentCodeModal] = useState(false);
 
   // 현재 날짜/시간 업데이트
   useEffect(() => {
@@ -327,6 +331,14 @@ const MainApp = () => {
                 </p>
                 <p className="text-xs text-muted-foreground">{user?.email}</p>
               </div>
+              <Button
+                onClick={() => setShowStudentCodeModal(true)}
+                size="sm"
+                className="bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-200 text-xs tablet:text-sm"
+              >
+                <span className="hidden tablet:inline">🔑 학생 코드</span>
+                <span className="tablet:hidden">🔑</span>
+              </Button>
               <Button onClick={signOut} size="sm" className="bg-red-100 hover:bg-red-200 text-red-700 border-red-200 text-xs tablet:text-sm">
                 로그아웃
               </Button>
@@ -780,6 +792,12 @@ const MainApp = () => {
           onOpenChange={setShowCreateGameModal}
           teams={teams}
           onCreateGame={handleCreateGame}
+        />
+
+        {/* 학생 코드 목록 모달 */}
+        <StudentCodeListModal
+          open={showStudentCodeModal}
+          onOpenChange={setShowStudentCodeModal}
         />
       </main>
     </div>

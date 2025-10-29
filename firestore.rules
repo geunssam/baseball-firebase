@@ -18,6 +18,28 @@ service cloud.firestore {
     }
 
     // ============================================
+    // CollectionGroup 쿼리 지원 (학생 로그인용)
+    // ============================================
+
+    // 학생 코드로 로그인할 때 모든 users의 students 컬렉션 검색 허용
+    match /{path=**}/students/{studentId} {
+      allow read: if true;  // 학생 코드로 로그인하기 위해 collectionGroup 쿼리 허용
+    }
+
+    // 학생용 데이터 조회를 위한 collectionGroup 규칙들
+    match /{path=**}/finishedGames/{gameId} {
+      allow read: if true;  // 학생이 경기 기록을 볼 수 있도록
+    }
+
+    match /{path=**}/playerBadges/{playerId} {
+      allow read: if true;  // 학생이 배지를 볼 수 있도록
+    }
+
+    match /{path=**}/playerHistory/{playerId} {
+      allow read: if true;  // 학생이 기록을 볼 수 있도록
+    }
+
+    // ============================================
     // 사용자별 데이터 (users 컬렉션)
     // ============================================
 
@@ -28,9 +50,9 @@ service cloud.firestore {
         allow write: if isOwner(userId);
       }
 
-      // 학생 데이터: 소유자만 읽기/쓰기
+      // 학생 데이터: 소유자만 쓰기 (읽기는 위의 collectionGroup 규칙으로 처리됨)
       match /students/{studentId} {
-        allow read, write: if isOwner(userId);
+        allow write: if isOwner(userId);
       }
 
       // 팀 데이터: 소유자만 읽기/쓰기 (간단 버전)
@@ -43,19 +65,19 @@ service cloud.firestore {
         allow read, write: if isOwner(userId);
       }
 
-      // 종료된 경기
+      // 종료된 경기: 소유자만 쓰기 (읽기는 collectionGroup 규칙으로 처리됨)
       match /finishedGames/{gameId} {
-        allow read, write: if isOwner(userId);
+        allow write: if isOwner(userId);
       }
 
-      // 선수 배지
+      // 선수 배지: 소유자만 쓰기 (읽기는 collectionGroup 규칙으로 처리됨)
       match /playerBadges/{playerId} {
-        allow read, write: if isOwner(userId);
+        allow write: if isOwner(userId);
       }
 
-      // 선수 히스토리
+      // 선수 히스토리: 소유자만 쓰기 (읽기는 collectionGroup 규칙으로 처리됨)
       match /playerHistory/{playerId} {
-        allow read, write: if isOwner(userId);
+        allow write: if isOwner(userId);
       }
 
       // 설정
