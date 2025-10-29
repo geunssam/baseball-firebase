@@ -318,13 +318,11 @@ export default function StudentView() {
               </button>
               <button
                 onClick={() => {
-                  if (confirm('로그아웃하시겠습니까?')) {
-                    logout();
-                  }
+                  logout();
                 }}
-                className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition shadow-lg hover:shadow-xl"
+                className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition shadow-lg hover:shadow-xl"
               >
-                로그아웃
+                ← 선생님 페이지로 돌아가기
               </button>
             </div>
           </div>

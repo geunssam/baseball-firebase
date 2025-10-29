@@ -19,6 +19,7 @@ import BadgeProgressIndicator from './BadgeProgressIndicator';
 import InningLineupChangeModal from './InningLineupChangeModal';
 import { checkNewBadges, calculatePlayerTotalStats, BADGES } from '../utils/badgeSystem';
 import { getNextBadgesProgress } from '../utils/badgeProgress';
+import { debugLog } from '../types/gameTypes';
 
 /**
  * SortableAttackRow 컴포넌트
@@ -306,45 +307,60 @@ const GameScreen = ({ gameId, onExit }) => {
             // 3. 새로 획득한 배지 찾기
             const allNewBadges = [];
 
-            // ✅ 새 경기인 경우: playerHistory 기반으로 첫 출전 여부 판단
+            // ✅ 새 경기인 경우: 출전 관련 모든 배지 체크 (첫 출전, 10경기, 30경기, 50경기, 100경기)
             if (currentGame.isNewGame && !hasShownInitialBadgesRef.current) {
-              console.log('🆕 새 경기 감지! 첫 출전 배지 체크 시작...');
+              console.log('🆕 새 경기 감지! 출전 관련 배지 체크 시작...');
 
-              refreshedTeamA.lineup.forEach((player) => {
+              // 양팀 선수 모두 체크
+              const allPlayers = [...refreshedTeamA.lineup, ...refreshedTeamB.lineup];
+
+              for (const player of allPlayers) {
                 const playerId = player.id || player.playerId;
+                if (!playerId) continue;
+
                 const history = playerHistory[playerId] || [];
 
-                // 현재 경기를 제외한 과거 경기 수
-                const pastGames = history.filter(g => g.gameId !== gameId);
-                const isFirstGame = pastGames.length === 0;
+                // 현재 경기를 포함한 총 경기 수 (isNewGame이므로 현재 경기는 이미 포함됨)
+                const totalGames = history.length;
 
-                if (isFirstGame && player.badges?.includes('first_game')) {
-                  console.log(`🎽 ${player.name}: 첫 출전 배지 획득!`);
-                  const badge = BADGES.first_game;
-                  allNewBadges.push({
-                    ...badge,
-                    playerName: player.name
-                  });
+                debugLog('BADGE_CHECK', `${player.name}: 총 ${totalGames}경기 출전`, { playerId, history: history.length });
+
+                // 출전 관련 배지 체크 (실제 BADGES ID 사용)
+                const gameBadgesToCheck = [
+                  { id: 'first_game', games: 1, name: '첫 출전' },
+                  { id: 'iron_man', games: 10, name: '철인' },
+                  { id: 'immortal', games: 30, name: '불멸의 선수' }
+                ];
+
+                for (const badgeInfo of gameBadgesToCheck) {
+                  // 해당 경기 수를 정확히 달성했고, 아직 배지가 없는 경우
+                  if (totalGames === badgeInfo.games && !player.badges?.includes(badgeInfo.id)) {
+                    const badge = BADGES[badgeInfo.id];
+                    if (badge) {
+                      console.log(`🎽 ${player.name}: ${badgeInfo.name} 배지 획득! (${totalGames}경기)`);
+
+                      // 배지 즉시 수여
+                      try {
+                        await firestoreService.savePlayerBadges(playerId, {
+                          badges: [...(player.badges || []), badgeInfo.id],
+                          playerName: player.name
+                        });
+
+                        // UI에 표시할 배지 목록에 추가
+                        allNewBadges.push({
+                          ...badge,
+                          playerName: player.name
+                        });
+
+                        // 플레이어 객체에도 배지 추가 (UI 즉시 반영)
+                        player.badges = [...(player.badges || []), badgeInfo.id];
+                      } catch (error) {
+                        console.error(`❌ ${player.name} ${badgeInfo.name} 배지 저장 실패:`, error);
+                      }
+                    }
+                  }
                 }
-              });
-
-              refreshedTeamB.lineup.forEach((player) => {
-                const playerId = player.id || player.playerId;
-                const history = playerHistory[playerId] || [];
-
-                // 현재 경기를 제외한 과거 경기 수
-                const pastGames = history.filter(g => g.gameId !== gameId);
-                const isFirstGame = pastGames.length === 0;
-
-                if (isFirstGame && player.badges?.includes('first_game')) {
-                  console.log(`🎽 ${player.name}: 첫 출전 배지 획득!`);
-                  const badge = BADGES.first_game;
-                  allNewBadges.push({
-                    ...badge,
-                    playerName: player.name
-                  });
-                }
-              });
+              }
 
             } else {
               // 기존 경기: 배지 비교 로직 (기존 코드 유지)
@@ -1297,24 +1313,47 @@ const GameScreen = ({ gameId, onExit }) => {
     const actualStudentId = actualStudent.id;
     console.log(`🔍 배지 체크: ${player.name} | 라인업 ID: ${player.id} | 실제 학생 ID: ${actualStudentId}`);
 
-    // ✨ 전체 누적 통계 계산 (playerHistory 기반)
+    // ✨ 전체 누적 통계 계산 (과거 히스토리 + 현재 경기 스탯)
     let totalStats = {};
     try {
       const { games: history = [] } = await firestoreService.getPlayerHistory(actualStudentId);
-      totalStats = calculatePlayerTotalStats(history); // ✅ 배열 전달
-      console.log(`📊 ${player.name} 전체 통계:`, totalStats);
+
+      // 1. 과거 경기 통계 계산
+      const pastStats = calculatePlayerTotalStats(history);
+      debugLog('BADGE_CHECK', `${player.name} 과거 통계`, pastStats);
+
+      // 2. 현재 경기 스탯 추가
+      const currentStats = player.stats || {};
+
+      // 3. 과거 + 현재 합산
+      totalStats = {
+        totalHits: pastStats.totalHits + (currentStats.hits || 0),
+        totalRuns: pastStats.totalRuns + (currentStats.runs || 0),
+        totalHomerun: (pastStats.totalHomerun || 0) + (currentStats.homerun || 0),
+        totalGoodDefense: pastStats.totalGoodDefense + (currentStats.goodDefense || 0),
+        totalBonusCookie: pastStats.totalBonusCookie + (currentStats.bonusCookie || 0),
+        totalPoints: pastStats.totalPoints + (currentStats.hits || 0) + (currentStats.runs || 0) + (currentStats.goodDefense || 0) + (currentStats.bonusCookie || 0),
+        gamesPlayed: pastStats.gamesPlayed + 1, // 현재 경기 포함
+        mvpCount: pastStats.mvpCount || 0,
+        hasPerfectGame: pastStats.hasPerfectGame || false
+      };
+
+      console.log(`📊 ${player.name} 전체 통계 (과거+현재):`, totalStats);
+      debugLog('BADGE_CHECK', `현재 경기 스탯`, currentStats);
 
       // 선수 객체에 totalStats 저장 (프로그레스 바에서 사용)
       player.totalStats = totalStats;
     } catch (error) {
       console.warn(`⚠️ ${player.name} 전체 통계 계산 실패:`, error);
       // Fallback: 현재 경기 통계만 사용
+      const currentStats = player.stats || {};
       totalStats = {
-        totalHits: player.stats?.hits || 0,
-        totalRuns: player.stats?.runs || 0,
-        totalGoodDefense: player.stats?.goodDefense || 0,
-        totalBonusCookie: player.stats?.bonusCookie || 0,
-        totalPoints: (player.stats?.points || 0),
+        totalHits: currentStats.hits || 0,
+        totalRuns: currentStats.runs || 0,
+        totalHomerun: currentStats.homerun || 0,
+        totalGoodDefense: currentStats.goodDefense || 0,
+        totalBonusCookie: currentStats.bonusCookie || 0,
+        totalPoints: (currentStats.hits || 0) + (currentStats.runs || 0) + (currentStats.goodDefense || 0) + (currentStats.bonusCookie || 0),
         gamesPlayed: 1,
         mvpCount: 0,
         hasPerfectGame: false
