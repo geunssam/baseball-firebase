@@ -17,6 +17,7 @@ import RunnersLeftOnBaseModal from './RunnersLeftOnBaseModal';
 import BadgePopup from './BadgePopup';
 import BadgeProgressIndicator from './BadgeProgressIndicator';
 import InningLineupChangeModal from './InningLineupChangeModal';
+import PlayerBadgeOrderModal from './PlayerBadgeOrderModal';
 import { checkNewBadges, calculatePlayerTotalStats, BADGES } from '../utils/badgeSystem';
 import { getNextBadgesProgress } from '../utils/badgeProgress';
 import { debugLog } from '../types/gameTypes';
@@ -171,6 +172,10 @@ const GameScreen = ({ gameId, onExit }) => {
   const [showLineupChangeModal, setShowLineupChangeModal] = useState(false); // 라인업 전체 교체 모달
   const [lineupChangeTeamKey, setLineupChangeTeamKey] = useState(null); // 'teamA' | 'teamB'
 
+  // 배지 관리 모달 상태
+  const [showBadgeManageModal, setShowBadgeManageModal] = useState(false); // 배지 관리 모달 표시 여부
+  const [selectedPlayerForBadge, setSelectedPlayerForBadge] = useState(null); // 배지 관리할 선수 정보
+
   // 드래그 앤 드롭 센서 설정
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -258,22 +263,28 @@ const GameScreen = ({ gameId, onExit }) => {
         const loadBadgesForTeam = async (team) => {
           if (!team || !team.lineup) return team;
 
+          console.log(`🔄 ${team.name} 팀 배지 로드 시작...`);
+
           const lineupWithBadges = await Promise.all(
             team.lineup.map(async (player) => {
               if (!player.id) return player;
 
               try {
+                console.log(`  🔍 ${player.name} (${player.id}) 배지 로드...`);
                 const badgeData = await firestoreService.getPlayerBadges(player.id);
+                console.log(`    → 배지:`, badgeData);
                 return {
                   ...player,
                   badges: badgeData.badges || []
                 };
               } catch (error) {
-                console.warn(`⚠️ ${player.name} 배지 로드 실패, 빈 배열로 초기화`);
+                console.warn(`⚠️ ${player.name} 배지 로드 실패, 빈 배열로 초기화`, error);
                 return { ...player, badges: [] };
               }
             })
           );
+
+          console.log(`✅ ${team.name} 팀 배지 로드 완료 (${lineupWithBadges.length}명)`);
 
           return { ...team, lineup: lineupWithBadges };
         };
@@ -759,6 +770,71 @@ const GameScreen = ({ gameId, onExit }) => {
     } catch (error) {
       console.error('❌ 라인업 교체 실패:', error);
       alert('❌ 라인업 교체에 실패했습니다.');
+    }
+  };
+
+  // 선수 이름 클릭 시 배지 관리 모달 열기
+  const handlePlayerNameClick = async (player) => {
+    try {
+      // 1. Firestore에서 최신 배지 정보 로드
+      const playerId = player.id || player.playerId;
+      console.log(`🔍 ${player.name} (${playerId}) 배지 로드 시도...`);
+
+      const badgeData = await firestoreService.getPlayerBadges(playerId);
+      console.log(`  → 배지 데이터:`, badgeData);
+
+      // 2. 최신 배지로 업데이트된 player 객체 생성
+      const updatedPlayer = {
+        ...player,
+        badges: badgeData?.badges || []
+      };
+
+      console.log(`  → 최종 배지 수: ${updatedPlayer.badges.length}`);
+
+      setSelectedPlayerForBadge(updatedPlayer);
+      setShowBadgeManageModal(true);
+    } catch (error) {
+      console.error('❌ 배지 로드 실패:', error);
+      // 실패해도 모달은 열기 (빈 배지로)
+      setSelectedPlayerForBadge({
+        ...player,
+        badges: player.badges || []
+      });
+      setShowBadgeManageModal(true);
+    }
+  };
+
+  // 배지 관리 모달 닫기
+  const handleBadgeManageModalClose = () => {
+    setShowBadgeManageModal(false);
+    setSelectedPlayerForBadge(null);
+  };
+
+  // 배지 순서 저장
+  const handleBadgeOrderSave = async (newBadgeOrder) => {
+    if (!selectedPlayerForBadge || !game) return;
+
+    try {
+      const newGame = { ...game };
+
+      // player.id로 teamA와 teamB에서 선수 찾기
+      const teamA_idx = newGame.teamA.lineup.findIndex(p => p.id === selectedPlayerForBadge.id);
+      const teamB_idx = newGame.teamB.lineup.findIndex(p => p.id === selectedPlayerForBadge.id);
+
+      if (teamA_idx >= 0) {
+        newGame.teamA.lineup[teamA_idx].badges = newBadgeOrder;
+        debugLog('배지', `✅ ${selectedPlayerForBadge.name}의 배지 순서 업데이트 (팀A)`);
+      } else if (teamB_idx >= 0) {
+        newGame.teamB.lineup[teamB_idx].badges = newBadgeOrder;
+        debugLog('배지', `✅ ${selectedPlayerForBadge.name}의 배지 순서 업데이트 (팀B)`);
+      }
+
+      await updateGame(game.id, newGame);
+      console.log('✅ 배지 순서 저장 완료:', newBadgeOrder);
+      handleBadgeManageModalClose();
+    } catch (error) {
+      console.error('❌ 배지 순서 저장 실패:', error);
+      alert('❌ 배지 순서 저장에 실패했습니다.');
     }
   };
 
@@ -2375,7 +2451,13 @@ const GameScreen = ({ gameId, onExit }) => {
 
                                     {/* 이름 + 진행도 - 오른쪽 */}
                                     <div className="flex flex-col gap-1 flex-1">
-                                      <span className="font-bold">{player.name}</span>
+                                      <span
+                                        className="font-bold cursor-pointer underline decoration-dotted decoration-gray-400 hover:decoration-solid hover:decoration-blue-600 hover:text-blue-600 transition-colors"
+                                        onClick={() => handlePlayerNameClick(player)}
+                                        title="배지 관리 클릭"
+                                      >
+                                        {player.name}
+                                      </span>
                                       <BadgeProgressIndicator
                                         progressData={getNextBadgesProgress(calculateLiveTotalStats(player) || player.stats || {}, player.badges || [], BADGES, true)}
                                       />
@@ -2483,7 +2565,13 @@ const GameScreen = ({ gameId, onExit }) => {
 
                                     {/* 이름 + 진행도 - 오른쪽 */}
                                     <div className="flex flex-col gap-1 flex-1">
-                                      <span className="font-bold">{player.name}</span>
+                                      <span
+                                        className="font-bold cursor-pointer underline decoration-dotted decoration-gray-400 hover:decoration-solid hover:decoration-blue-600 hover:text-blue-600 transition-colors"
+                                        onClick={() => handlePlayerNameClick(player)}
+                                        title="배지 관리 클릭"
+                                      >
+                                        {player.name}
+                                      </span>
                                       <BadgeProgressIndicator
                                         progressData={getNextBadgesProgress(calculateLiveTotalStats(player) || player.stats || {}, player.badges || [], BADGES, true)}
                                       />
@@ -2821,7 +2909,13 @@ const GameScreen = ({ gameId, onExit }) => {
 
                             {/* 이름 + 진행도 - 오른쪽 */}
                             <div className="flex flex-col gap-1 flex-1">
-                              <span className="font-bold">{player.name}</span>
+                              <span
+                                className="font-bold cursor-pointer underline decoration-dotted decoration-gray-400 hover:decoration-solid hover:decoration-blue-600 hover:text-blue-600 transition-colors"
+                                onClick={() => handlePlayerNameClick(player)}
+                                title="배지 관리 클릭"
+                              >
+                                {player.name}
+                              </span>
                               <BadgeProgressIndicator
                                 progressData={getNextBadgesProgress(calculateLiveTotalStats(player) || player.stats || {}, player.badges || [], BADGES, true)}
                               />
@@ -3128,6 +3222,17 @@ const GameScreen = ({ gameId, onExit }) => {
         opponentTeamName={lineupChangeTeamKey === 'teamA' ? game?.teamB?.name : game?.teamA?.name}
         onConfirmChange={handleConfirmLineupChange}
       />
+
+      {/* 배지 관리 모달 */}
+      {showBadgeManageModal && selectedPlayerForBadge && (
+        <PlayerBadgeOrderModal
+          player={selectedPlayerForBadge}
+          allBadges={BADGES}
+          onClose={handleBadgeManageModalClose}
+          onSave={handleBadgeOrderSave}
+          playerStats={calculateLiveTotalStats(selectedPlayerForBadge) || selectedPlayerForBadge.stats || {}}
+        />
+      )}
     </div>
   );
 };

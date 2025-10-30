@@ -145,16 +145,35 @@ const calculateTarget = (badge, stats) => {
  * 배지의 현재 진행 상황 계산
  */
 const calculateCurrent = (badge, stats) => {
-  if (badge.id.includes('hit')) return stats.totalHits || 0;
-  if (badge.id.includes('run')) return stats.totalRuns || 0;
-  if (badge.id.includes('defense')) return stats.totalGoodDefense || 0;
-  if (badge.id.includes('cookie')) return stats.totalBonusCookie || 0;
-  if (badge.id.includes('steady') || badge.id.includes('veteran') || badge.id.includes('iron') || badge.id.includes('immortal')) {
+  // 경기 참여 관련
+  if (badge.id.includes('game') || badge.id.includes('steady') || badge.id.includes('iron') || badge.id.includes('immortal')) {
     return stats.gamesPlayed || 0;
   }
+
+  // 안타 관련
+  if (badge.id.includes('hit')) return stats.totalHits || 0;
+
+  // 득점 관련
+  if (badge.id.includes('run')) return stats.totalRuns || 0;
+
+  // 수비 관련
+  if (badge.id.includes('defense')) return stats.totalGoodDefense || 0;
+
+  // 쿠키 관련
+  if (badge.id.includes('cookie')) return stats.totalBonusCookie || 0;
+
+  // MVP 관련
   if (badge.id.includes('mvp')) return stats.mvpCount || 0;
-  if (badge.id.includes('all_rounder')) return stats.totalPoints || 0;
-  
+
+  // 올라운더 관련
+  if (badge.id.includes('all_rounder') || badge.id.includes('rounder')) return stats.totalPoints || 0;
+
+  // 완전체 관련
+  if (badge.id.includes('perfect') || badge.id.includes('hall_of_fame')) {
+    // 완전체는 전체 배지 수로 계산
+    return stats.totalBadges || 0;
+  }
+
   return 0;
 };
 
@@ -162,13 +181,20 @@ const calculateCurrent = (badge, stats) => {
  * 특정 배지의 진행도만 계산
  */
 export const getBadgeProgress = (badge, stats) => {
+  const current = calculateCurrent(badge, stats);
+  const target = calculateTarget(badge, stats);
+
+  // ✨ 입문 배지(progress 함수 없음)도 0% 진행도로 표시
   if (typeof badge.progress !== 'function') {
-    return null;
+    return {
+      badge,
+      progress: 0,  // 입문 배지는 0% 진행도
+      current,
+      target
+    };
   }
 
   const progressPercent = badge.progress(stats);
-  const current = calculateCurrent(badge, stats);
-  const target = calculateTarget(badge, stats);
 
   return {
     badge,

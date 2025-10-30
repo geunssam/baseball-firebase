@@ -9,42 +9,42 @@ export const BADGE_CATEGORIES = {
     name: '경기 참여',
     icon: '📊',
     description: '경기 출전 관련 배지',
-    badgeIds: ['first_game', 'steady', 'veteran', 'iron_man', 'immortal']
+    badgeIds: ['first_game', 'steady', 'iron_man', 'immortal']
   },
   HITS: {
     id: 'hits',
     name: '안타',
     icon: '⚾',
     description: '안타 관련 배지',
-    badgeIds: ['first_hit', 'hit_maker', 'super_hitter', 'legend_hitter']
+    badgeIds: ['first_hit', 'hit_maker', 'hit_king', 'legend_hitter']
   },
   RUNS: {
     id: 'runs',
     name: '득점',
     icon: '🏃',
     description: '득점 관련 배지',
-    badgeIds: ['first_run', 'running_machine', 'speed_demon', 'legend_runner']
+    badgeIds: ['first_run', 'running_machine', 'run_king', 'legend_runner']
   },
   DEFENSE: {
     id: 'defense',
     name: '수비',
     icon: '🛡️',
     description: '수비 관련 배지',
-    badgeIds: ['first_defense', 'defense_master', 'ultimate_defender', 'legend_defender']
+    badgeIds: ['first_defense', 'defense_master', 'defense_king', 'legend_defender']
   },
   COOKIES: {
     id: 'cookies',
     name: '쿠키',
     icon: '🍪',
     description: '보너스 쿠키 관련 배지',
-    badgeIds: ['first_cookie', 'cookie_collector', 'cookie_king', 'legend_cookie']
+    badgeIds: ['first_cookie', 'cookie_collector', 'cookie_rich', 'legend_cookie']
   },
   SPECIAL: {
     id: 'special',
     name: '특별',
     icon: '🏆',
     description: '특별한 업적 배지',
-    badgeIds: ['mvp', 'multi_mvp', 'mvp_king', 'all_rounder']
+    badgeIds: ['mvp_debut', 'mvp_hat_trick', 'mvp_king', 'superstar', 'perfect_game', 'all_rounder', 'super_rounder', 'ultra_rounder', 'perfect', 'hall_of_fame']
   }
 };
 
