@@ -10,6 +10,7 @@ import {
   where,
   onSnapshot,
   serverTimestamp,
+  Timestamp,
   writeBatch,
   orderBy,
   limit
@@ -32,6 +33,7 @@ import { db, auth } from '../config/firebase';
 
 class FirestoreService {
   constructor() {
+    this.db = db;
     this.currentUser = null;
     this.unsubscribers = []; // 리스너 정리용
   }
@@ -1082,6 +1084,103 @@ class FirestoreService {
     } catch (error) {
       console.error('❌ 프로필 생성 실패:', error);
       throw new Error('프로필 생성에 실패했습니다.');
+    }
+  }
+
+  // ============================================
+  // 개인정보 처리 동의 관련 함수
+  // ============================================
+
+  /**
+   * 개인정보 처리 동의 기록 조회
+   * @param {string} teacherId - 교사 ID (Google UID)
+   * @param {string} version - 처리방침 버전
+   * @returns {Promise<Object|null>} 동의 기록 또는 null
+   */
+  async checkPrivacyConsent(teacherId, version) {
+    try {
+      console.log('🔍 [checkPrivacyConsent] 조회 시작:', { teacherId, version });
+
+      // privacy_consents 컬렉션에서 해당 버전의 동의 기록 조회
+      // 문서 ID: {teacherId}_{version}
+      const consentId = `${teacherId}_${version}`;
+      const consentDoc = await getDoc(doc(this.db, 'privacy_consents', consentId));
+
+      if (!consentDoc.exists()) {
+        console.log('ℹ️ [checkPrivacyConsent] 동의 기록 없음 (정상)');
+        return null;
+      }
+
+      const data = { id: consentDoc.id, ...consentDoc.data() };
+      console.log('✅ [checkPrivacyConsent] 동의 기록 있음:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ [checkPrivacyConsent] 예외 발생:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 개인정보 처리 동의 저장 (교사)
+   * @param {Object} params - 동의 정보
+   * @param {string} params.teacherId - 교사 ID (Google UID)
+   * @param {string} params.teacherEmail - 교사 이메일
+   * @param {string} params.consentType - 동의 유형 ('teacher')
+   * @param {string} params.version - 처리방침 버전
+   * @param {boolean} params.termsAgreed - 이용약관 동의 여부
+   * @param {boolean} params.dataCollectionAgreed - 개인정보 수집 동의 여부
+   * @param {boolean} params.marketingAgreed - 마케팅 동의 여부 (선택)
+   * @returns {Promise<Object>} 저장된 동의 기록
+   */
+  async savePrivacyConsent({
+    teacherId,
+    teacherEmail,
+    consentType = 'teacher',
+    version,
+    termsAgreed,
+    dataCollectionAgreed,
+    marketingAgreed = false,
+  }) {
+    try {
+      console.log('📝 [savePrivacyConsent] 저장 시작:', {
+        teacherId,
+        teacherEmail,
+        consentType,
+        version,
+      });
+
+      // IP 주소 및 User Agent 수집
+      const ipAddress = null; // 클라이언트에서는 IP 직접 수집 불가
+      const userAgent = navigator.userAgent;
+
+      // privacy_consents 컬렉션에 저장
+      // 문서 ID: {teacherId}_{version}
+      const consentId = `${teacherId}_${version}`;
+      const consentData = {
+        consentType,
+        teacherId,
+        teacherEmail,
+        privacyPolicyVersion: version,
+        termsAgreed,
+        dataCollectionAgreed,
+        marketingAgreed,
+        ipAddress,
+        userAgent,
+        consentDate: Timestamp.now(),
+        metadata: {
+          lastUpdated: Timestamp.now(),
+          updatedBy: 'system',
+        },
+      };
+
+      // set with merge: true를 사용하여 upsert 구현
+      await setDoc(doc(this.db, 'privacy_consents', consentId), consentData, { merge: true });
+
+      console.log('✅ [savePrivacyConsent] 저장 완료:', consentId);
+      return { id: consentId, ...consentData };
+    } catch (error) {
+      console.error('❌ [savePrivacyConsent] 예외 발생:', error);
+      throw error;
     }
   }
 }

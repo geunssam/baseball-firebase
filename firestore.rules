@@ -110,5 +110,20 @@ service cloud.firestore {
                        (resource.data.requesterId == request.auth.uid ||
                         resource.data.ownerId == request.auth.uid);
     }
+
+    // ============================================
+    // 개인정보 처리 동의 (privacy_consents 컬렉션)
+    // ============================================
+
+    match /privacy_consents/{consentId} {
+      // 읽기: 본인의 동의 기록만
+      allow read: if isSignedIn() &&
+                     resource.data.teacherId == request.auth.uid;
+
+      // 쓰기: 본인의 동의 기록만 생성/수정 가능
+      allow write: if isSignedIn() &&
+                      request.resource.data.teacherId == request.auth.uid &&
+                      request.resource.data.consentType == 'teacher';
+    }
   }
 }

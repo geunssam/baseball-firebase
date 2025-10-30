@@ -4,6 +4,7 @@ import { GameProvider } from './contexts/GameContext';
 import UnifiedLoginPage from './components/auth/UnifiedLoginPage';
 import MainApp from './components/MainApp';
 import StudentView from './components/StudentView';
+import PrivacyConsentGuard from './components/PrivacyConsentGuard';
 import { Toaster } from 'react-hot-toast';
 import './index.css';
 
@@ -30,7 +31,11 @@ function AppContent() {
 
   // 교사로 로그인한 경우
   if (teacherUser) {
-    return <MainApp />;
+    return (
+      <PrivacyConsentGuard>
+        <MainApp />
+      </PrivacyConsentGuard>
+    );
   }
 
   // 로그인 안 한 경우 통합 로그인 페이지 표시
