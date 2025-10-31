@@ -6,7 +6,8 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
-import { ChevronLeft, Users } from 'lucide-react';
+import { ChevronLeft, Users, Trash2 } from 'lucide-react';
+import firestoreService from '../services/firestoreService';
 
 /**
  * BadgeCollection
@@ -114,6 +115,45 @@ const BadgeCollection = ({ onBack }) => {
     // 학생이 없어도 모달을 열어서 "아직 획득한 학생이 없습니다" 메시지를 보여줌
     setSelectedBadge({ ...badge, students: studentsWithBadge });
     setShowStudentListModal(true);
+  };
+
+  // 배지 삭제 핸들러
+  const handleDeleteBadge = async (student, badgeId) => {
+    if (!confirm(`${student.name} 학생의 "${selectedBadge?.name}" 배지를 정말 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) {
+      return;
+    }
+
+    try {
+      console.log(`🗑️ 배지 삭제 시작: ${student.name} (${student.id}) - ${badgeId}`);
+
+      // Firestore에서 배지 삭제
+      await firestoreService.removePlayerBadge(student.id, badgeId);
+
+      // 로컬 playerStats 업데이트 (즉시 UI 반영)
+      setPlayerStats(prev => {
+        const newStats = { ...prev };
+        if (newStats[student.id]) {
+          newStats[student.id] = {
+            ...newStats[student.id],
+            badges: newStats[student.id].badges.filter(id => id !== badgeId)
+          };
+        }
+        return newStats;
+      });
+
+      // 모달의 학생 목록 업데이트
+      const updatedStudents = getStudentsWithBadge(badgeId);
+      setSelectedBadge(prev => ({
+        ...prev,
+        students: updatedStudents
+      }));
+
+      alert(`✅ ${student.name} 학생의 배지가 삭제되었습니다.`);
+      console.log(`✅ 배지 삭제 완료`);
+    } catch (error) {
+      console.error('❌ 배지 삭제 실패:', error);
+      alert('배지 삭제에 실패했습니다. 다시 시도해주세요.');
+    }
   };
 
   // 배지 목록 필터링
@@ -322,8 +362,19 @@ const BadgeCollection = ({ onBack }) => {
                               </div>
                               <div className="font-semibold">{student.name}</div>
                             </div>
-                            <div className="text-xs text-muted-foreground">
-                              {student.acquiredAt}
+                            <div className="flex items-center gap-3">
+                              <div className="text-xs text-muted-foreground">
+                                {student.acquiredAt}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteBadge(student, selectedBadge.id)}
+                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                title="배지 삭제"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </div>
                           </div>
                         </Card>

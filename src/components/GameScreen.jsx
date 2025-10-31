@@ -174,7 +174,20 @@ const GameScreen = ({ gameId, onExit }) => {
 
   // 배지 관리 모달 상태
   const [showBadgeManageModal, setShowBadgeManageModal] = useState(false); // 배지 관리 모달 표시 여부
-  const [selectedPlayerForBadge, setSelectedPlayerForBadge] = useState(null); // 배지 관리할 선수 정보
+  const [selectedPlayerForBadgeId, setSelectedPlayerForBadgeId] = useState(null); // 배지 관리할 선수 ID
+
+  // ✅ 선수 ID로 최신 선수 정보 동적 조회 (game 상태가 업데이트되면 자동으로 최신 값 반영)
+  const getPlayerById = (playerId) => {
+    if (!game || !playerId) return null;
+
+    const playerInA = game.teamA.lineup.find(p => p.id === playerId);
+    if (playerInA) return playerInA;
+
+    const playerInB = game.teamB.lineup.find(p => p.id === playerId);
+    return playerInB;
+  };
+
+  const selectedPlayerForBadge = getPlayerById(selectedPlayerForBadgeId);
 
   // 드래그 앤 드롭 센서 설정
   const sensors = useSensors(
@@ -783,23 +796,29 @@ const GameScreen = ({ gameId, onExit }) => {
       const badgeData = await firestoreService.getPlayerBadges(playerId);
       console.log(`  → 배지 데이터:`, badgeData);
 
-      // 2. 최신 배지로 업데이트된 player 객체 생성
-      const updatedPlayer = {
-        ...player,
-        badges: badgeData?.badges || []
-      };
+      // 🔥 2. game 상태를 업데이트해서 최신 배지 정보 반영
+      const newGame = { ...game };
+      const teamA_idx = newGame.teamA.lineup.findIndex(p => p.id === playerId);
+      const teamB_idx = newGame.teamB.lineup.findIndex(p => p.id === playerId);
 
-      console.log(`  → 최종 배지 수: ${updatedPlayer.badges.length}`);
+      if (teamA_idx >= 0) {
+        newGame.teamA.lineup[teamA_idx].badges = badgeData?.badges || [];
+        console.log(`  → 팀A 선수 배지 업데이트: ${badgeData?.badges?.length || 0}개`);
+      } else if (teamB_idx >= 0) {
+        newGame.teamB.lineup[teamB_idx].badges = badgeData?.badges || [];
+        console.log(`  → 팀B 선수 배지 업데이트: ${badgeData?.badges?.length || 0}개`);
+      }
 
-      setSelectedPlayerForBadge(updatedPlayer);
+      // 🔥 3. 상태 업데이트 (모달 열기 전에 game 상태 먼저 업데이트)
+      setGame(newGame);
+
+      // 4. 모달 열기
+      setSelectedPlayerForBadgeId(playerId);
       setShowBadgeManageModal(true);
     } catch (error) {
       console.error('❌ 배지 로드 실패:', error);
-      // 실패해도 모달은 열기 (빈 배지로)
-      setSelectedPlayerForBadge({
-        ...player,
-        badges: player.badges || []
-      });
+      // 실패해도 모달은 열기 (현재 배지로)
+      setSelectedPlayerForBadgeId(playerId);
       setShowBadgeManageModal(true);
     }
   };
@@ -807,19 +826,23 @@ const GameScreen = ({ gameId, onExit }) => {
   // 배지 관리 모달 닫기
   const handleBadgeManageModalClose = () => {
     setShowBadgeManageModal(false);
-    setSelectedPlayerForBadge(null);
+    setSelectedPlayerForBadgeId(null);
   };
 
   // 배지 순서 저장
   const handleBadgeOrderSave = async (newBadgeOrder) => {
     if (!selectedPlayerForBadge || !game) return;
 
+    console.log('📥 [배지순서] 저장 요청 받음:', newBadgeOrder);
+    console.log('📥 [배지순서] 선수:', selectedPlayerForBadge.name);
+
     try {
+      const playerId = selectedPlayerForBadge.id;
       const newGame = { ...game };
 
       // player.id로 teamA와 teamB에서 선수 찾기
-      const teamA_idx = newGame.teamA.lineup.findIndex(p => p.id === selectedPlayerForBadge.id);
-      const teamB_idx = newGame.teamB.lineup.findIndex(p => p.id === selectedPlayerForBadge.id);
+      const teamA_idx = newGame.teamA.lineup.findIndex(p => p.id === playerId);
+      const teamB_idx = newGame.teamB.lineup.findIndex(p => p.id === playerId);
 
       if (teamA_idx >= 0) {
         newGame.teamA.lineup[teamA_idx].badges = newBadgeOrder;
@@ -829,12 +852,25 @@ const GameScreen = ({ gameId, onExit }) => {
         debugLog('배지', `✅ ${selectedPlayerForBadge.name}의 배지 순서 업데이트 (팀B)`);
       }
 
+      // ✅ 먼저 로컬 상태 업데이트 (즉시 UI 반영)
+      setGame(newGame);
+      console.log('📥 [배지순서] 로컬 상태 업데이트 완료');
+
+      // 🔥 Firestore의 playerBadges 컬렉션도 업데이트 (순서 저장)
+      await firestoreService.savePlayerBadges(playerId, {
+        badges: newBadgeOrder
+      });
+      console.log('📥 [배지순서] playerBadges 컬렉션 업데이트 완료');
+
+      // ✅ 그 다음 게임 상태 Firestore에 저장
       await updateGame(game.id, newGame);
-      console.log('✅ 배지 순서 저장 완료:', newBadgeOrder);
+      console.log('📥 [배지순서] 게임 상태 Firestore 저장 완료');
+
       handleBadgeManageModalClose();
     } catch (error) {
-      console.error('❌ 배지 순서 저장 실패:', error);
+      console.error('❌ [배지순서] 저장 실패:', error);
       alert('❌ 배지 순서 저장에 실패했습니다.');
+      throw error; // ✅ 에러를 상위로 전파
     }
   };
 
@@ -1076,12 +1112,16 @@ const GameScreen = ({ gameId, onExit }) => {
   const handleChangeStrikes = async (delta) => {
     if (!game) return;
 
+    console.log(`🎯 [스트라이크] 함수 호출: delta=${delta}, 현재=${game.currentStrikes || 0}`);
+
     try {
       const newGame = { ...game };
       const currentStrikes = newGame.currentStrikes || 0;
 
       // 스트라이크 2에서 +를 누르면 아웃 처리
       if (currentStrikes === 2 && delta === 1) {
+        console.log(`⚡ [삼진아웃] 조건 충족! 아웃 처리 시작...`);
+
         const attackTeam = newGame.isTopInning ? newGame.teamA : newGame.teamB;
         const currentBatterIndex = newGame.currentBatterIndex || 0;
         const currentBatter = attackTeam.lineup[currentBatterIndex];
@@ -1089,22 +1129,33 @@ const GameScreen = ({ gameId, onExit }) => {
         if (currentBatter) {
           // 현재 타자에게 아웃 기록
           currentBatter.outInInning = newGame.currentInning;
-          currentBatter.stats = currentBatter.stats || { hits: 0, runs: 0, cookies: 0 };
+          currentBatter.stats = currentBatter.stats || { hits: 0, single: 0, double: 0, triple: 0, homerun: 0, runs: 0, bonusCookie: 0, goodDefense: 0 };
 
           console.log(`⚾ ${currentBatter.name} 삼진아웃! (${newGame.currentInning}회)`);
         }
 
         // 아웃 카운트 증가
-        newGame.currentOuts = (newGame.currentOuts || 0) + 1;
+        const newOuts = (newGame.currentOuts || 0) + 1;
+        newGame.currentOuts = newOuts;
 
         // 스트라이크 초기화
         newGame.currentStrikes = 0;
 
         // 다음 타자로 이동
-        newGame.currentBatterIndex = (currentBatterIndex + 1) % attackTeam.lineup.length;
+        const nextBatterIndex = (currentBatterIndex + 1) % attackTeam.lineup.length;
+        newGame.currentBatterIndex = nextBatterIndex;
 
+        console.log(`📊 [삼진아웃] 아웃: ${newOuts}, 다음 타자 인덱스: ${nextBatterIndex}`);
+
+        // ✅ 먼저 로컬 상태를 즉시 업데이트하여 UI 반영 (다음 타자 하이라이트)
+        setGame(newGame);
+        console.log(`🔄 로컬 상태 즉시 업데이트: 다음 타자 인덱스=${nextBatterIndex}`);
+
+        // Firestore에도 저장
         await updateGame(game.id, newGame);
-        console.log(`✅ 삼진아웃 처리 완료 - 현재 아웃: ${newGame.currentOuts}`);
+
+        console.log(`✅ 삼진아웃 처리 완료`);
+        alert(`⚾ ${currentBatter?.name || '타자'} 삼진아웃!\n\n현재 아웃: ${newOuts}\n다음 타자: ${attackTeam.lineup[nextBatterIndex]?.name || '?'}`);
         return;
       }
 
@@ -1112,11 +1163,61 @@ const GameScreen = ({ gameId, onExit }) => {
       const newStrikes = Math.max(0, Math.min(2, currentStrikes + delta));
       newGame.currentStrikes = newStrikes;
 
+      console.log(`📊 [스트라이크] ${currentStrikes} → ${newStrikes}`);
+
       await updateGame(game.id, newGame);
-      console.log(`✅ 스트라이크: ${newStrikes}`);
+      console.log(`✅ 스트라이크 업데이트 완료: ${newStrikes}`);
     } catch (error) {
       console.error('❌ 스트라이크 업데이트 실패:', error);
       alert('스트라이크 업데이트에 실패했습니다.');
+    }
+  };
+
+  // 타격 아웃 핸들러 (공을 쳤으나 아웃된 경우: 플라이, 땅볼 등)
+  const handleBattedOut = async () => {
+    if (!game) return;
+
+    console.log('⚾ [타격 아웃] 함수 호출');
+
+    try {
+      const newGame = { ...game };
+      const attackTeam = newGame.isTopInning ? newGame.teamA : newGame.teamB;
+      const currentBatterIndex = newGame.currentBatterIndex || 0;
+      const currentBatter = attackTeam.lineup[currentBatterIndex];
+
+      if (currentBatter) {
+        // 현재 타자에게 아웃 기록 (이닝 정보 저장)
+        currentBatter.outInInning = newGame.currentInning;
+        currentBatter.stats = currentBatter.stats || { hits: 0, single: 0, double: 0, triple: 0, homerun: 0, runs: 0, bonusCookie: 0, goodDefense: 0 };
+
+        console.log(`⚾ ${currentBatter.name} 타격 아웃! (${newGame.currentInning}회)`);
+      }
+
+      // 아웃 카운트 증가
+      const newOuts = (newGame.currentOuts || 0) + 1;
+      newGame.currentOuts = newOuts;
+
+      // 스트라이크 초기화
+      newGame.currentStrikes = 0;
+
+      // 다음 타자로 이동
+      const nextBatterIndex = (currentBatterIndex + 1) % attackTeam.lineup.length;
+      newGame.currentBatterIndex = nextBatterIndex;
+
+      console.log(`📊 [타격 아웃] 아웃: ${newOuts}, 다음 타자 인덱스: ${nextBatterIndex}`);
+
+      // ✅ 먼저 로컬 상태를 즉시 업데이트하여 UI 반영 (다음 타자 하이라이트)
+      setGame(newGame);
+      console.log(`🔄 로컬 상태 즉시 업데이트: 다음 타자 인덱스=${nextBatterIndex}`);
+
+      // Firestore에도 저장
+      await updateGame(game.id, newGame);
+
+      console.log(`✅ 타격 아웃 처리 완료`);
+      alert(`⚾ ${currentBatter?.name || '타자'} 타격 아웃!\n\n현재 아웃: ${newOuts}\n다음 타자: ${attackTeam.lineup[nextBatterIndex]?.name || '?'}`);
+    } catch (error) {
+      console.error('❌ 타격 아웃 처리 실패:', error);
+      alert('타격 아웃 처리에 실패했습니다.');
     }
   };
 
@@ -1532,6 +1633,7 @@ const GameScreen = ({ gameId, onExit }) => {
     console.log('🔍 득점 계산 시작');
     console.log('  안타 전 주자:', beforeHitRunners);
     console.log('  조정 후 주자:', adjustedRunners);
+    console.log('  현재 타자:', currentBatter);
 
     // 원래 있던 모든 주자를 확인하여 현재 어떤 베이스에도 없으면 득점으로 간주
     const allOriginalRunners = [];
@@ -1539,7 +1641,16 @@ const GameScreen = ({ gameId, onExit }) => {
     if (beforeHitRunners?.second) allOriginalRunners.push({ ...beforeHitRunners.second, base: 'second' });
     if (beforeHitRunners?.first) allOriginalRunners.push({ ...beforeHitRunners.first, base: 'first' });
 
-    // 각 원래 주자가 현재 어디에 있는지 확인
+    // ✅ 타자도 득점 계산 대상에 추가 (홈런 타자 득점 누락 방지)
+    if (currentBatter) {
+      allOriginalRunners.push({
+        name: currentBatter.name,
+        playerIndex: currentBatter.playerIndex,
+        base: 'batter'
+      });
+    }
+
+    // 각 원래 주자(+ 타자)가 현재 어디에 있는지 확인
     allOriginalRunners.forEach(runner => {
       const isOnFirst = adjustedRunners.first?.playerIndex === runner.playerIndex;
       const isOnSecond = adjustedRunners.second?.playerIndex === runner.playerIndex;
@@ -1588,6 +1699,16 @@ const GameScreen = ({ gameId, onExit }) => {
 
     // 조정된 주자 상황 적용
     newGame.runners = adjustedRunners;
+
+    // ✅ 타자가 아웃이 아니면 다음 타자로 이동 (안타 후 타자 인덱스 자동 변경)
+    if (batterStatus !== 'out') {
+      const currentBatterIndex = newGame.currentBatterIndex || 0;
+      const nextBatterIndex = (currentBatterIndex + 1) % team.lineup.length;
+      newGame.currentBatterIndex = nextBatterIndex;
+      console.log(`📍 안타 후 다음 타자로 이동: ${currentBatterIndex} → ${nextBatterIndex} (다음 타자: ${team.lineup[nextBatterIndex]?.name || '?'})`);
+    } else {
+      console.log(`⚠️ 타자 아웃 처리됨 - 타자 인덱스 이동 없음`);
+    }
 
     // Firestore 업데이트
     try {
@@ -2325,6 +2446,15 @@ const GameScreen = ({ gameId, onExit }) => {
                       </button>
                     </div>
                   </div>
+
+                  {/* ⚾ 타격 아웃 버튼 (새로 추가) */}
+                  <button
+                    onClick={handleBattedOut}
+                    className="w-full py-1.5 bg-red-500 hover:bg-red-600 text-white font-bold text-[11px] rounded shadow-sm transition"
+                    title="타자가 공을 쳤으나 아웃된 경우 (플라이, 땅볼 등)"
+                  >
+                    타격 아웃
+                  </button>
                 </div>
               </div>
                 )}
@@ -2949,7 +3079,11 @@ const GameScreen = ({ gameId, onExit }) => {
                             // 일반 모드: +/- 버튼
                             <div className="flex items-center justify-center gap-0.5">
                               <button
-                                onClick={() => handleUpdatePlayerStat(!game.isTopInning, i, 'goodDefense', -1)}
+                                onClick={() => {
+                                  // 수비팀은 공격팀의 반대편
+                                  const isDefenseTeamA = !game.isTopInning;
+                                  handleUpdatePlayerStat(isDefenseTeamA, i, 'goodDefense', -1);
+                                }}
                                 disabled={isCompleted}
                                 className={`px-1.5 h-7 rounded-l text-xs font-bold ${
                                   isCompleted
@@ -2960,7 +3094,11 @@ const GameScreen = ({ gameId, onExit }) => {
                                 -
                               </button>
                               <button
-                                onClick={() => handleUpdatePlayerStat(!game.isTopInning, i, 'goodDefense', 1)}
+                                onClick={() => {
+                                  // 수비팀은 공격팀의 반대편
+                                  const isDefenseTeamA = !game.isTopInning;
+                                  handleUpdatePlayerStat(isDefenseTeamA, i, 'goodDefense', 1);
+                                }}
                                 disabled={isCompleted}
                                 className={`px-2 h-7 rounded-r text-xs font-bold min-w-[40px] ${
                                   isCompleted
@@ -2985,7 +3123,11 @@ const GameScreen = ({ gameId, onExit }) => {
                             // 일반 모드: +/- 버튼
                             <div className="flex items-center justify-center gap-0.5">
                               <button
-                                onClick={() => handleUpdatePlayerStat(!game.isTopInning, i, 'bonusCookie', -1)}
+                                onClick={() => {
+                                  // 수비팀은 공격팀의 반대편
+                                  const isDefenseTeamA = !game.isTopInning;
+                                  handleUpdatePlayerStat(isDefenseTeamA, i, 'bonusCookie', -1);
+                                }}
                                 disabled={isCompleted}
                                 className={`px-1.5 h-7 rounded-l text-xs font-bold ${
                                   isCompleted
@@ -2996,7 +3138,11 @@ const GameScreen = ({ gameId, onExit }) => {
                                 -
                               </button>
                               <button
-                                onClick={() => handleUpdatePlayerStat(!game.isTopInning, i, 'bonusCookie', 1)}
+                                onClick={() => {
+                                  // 수비팀은 공격팀의 반대편
+                                  const isDefenseTeamA = !game.isTopInning;
+                                  handleUpdatePlayerStat(isDefenseTeamA, i, 'bonusCookie', 1);
+                                }}
                                 disabled={isCompleted}
                                 className={`px-2 h-7 rounded-r text-xs font-bold min-w-[40px] ${
                                   isCompleted

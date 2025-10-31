@@ -620,26 +620,33 @@ const MainApp = () => {
                   {completedGames.map((game) => (
                     <Card
                       key={game.id}
-                      className={`hover:shadow-lg transition-all duration-200 border-red-200 ${
+                      className={`hover:shadow transition-all border-2 ${
                         selectedCompletedGames.includes(game.id)
-                          ? 'bg-red-100 border-red-300'
-                          : 'bg-red-50'
+                          ? 'bg-red-100 border-red-400'
+                          : 'bg-red-50 border-red-200'
                       }`}
                     >
-                      <CardHeader>
-                        <div className="flex items-start gap-2">
+                      <CardHeader className="p-2">
+                        <div className="flex items-center gap-2">
                           <input
                             type="checkbox"
                             checked={selectedCompletedGames.includes(game.id)}
                             onChange={() => handleToggleCompletedGame(game.id)}
-                            className="mt-2 w-4 h-4 cursor-pointer flex-shrink-0"
+                            className="w-4 h-4 cursor-pointer flex-shrink-0"
                           />
-                          <div className="flex-1 text-center">
-                            <CardTitle className="text-lg text-black font-bold mb-1">
-                              ⚾ {game.teamA.name} vs {game.teamB.name}
-                            </CardTitle>
-                            <CardDescription className="text-sm text-gray-700 font-medium">
-                              📅 {(game.finishedAt || game.createdAt) && (() => {
+                          <div className="flex-1 flex items-center justify-between">
+                            {/* 팀명과 점수 */}
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-sm">{game.teamA.name}</span>
+                              <span className="font-bold text-lg text-blue-600">{game.scoreBoard.teamATotal}</span>
+                              <span className="text-gray-400 text-xs">:</span>
+                              <span className="font-bold text-lg text-red-600">{game.scoreBoard.teamBTotal}</span>
+                              <span className="font-semibold text-sm">{game.teamB.name}</span>
+                            </div>
+
+                            {/* 시간 정보 */}
+                            <div className="flex items-center gap-2 text-xs text-gray-600">
+                              <span>📅 {(game.finishedAt || game.createdAt) && (() => {
                                 try {
                                   const finishedAt = game.finishedAt || game.createdAt;
                                   let timestamp;
@@ -656,42 +663,28 @@ const MainApp = () => {
                                     timestamp = new Date();
                                   }
 
-                                  const month = String(timestamp.getMonth() + 1).padStart(2, '0');
-                                  const day = String(timestamp.getDate()).padStart(2, '0');
+                                  const month = timestamp.getMonth() + 1;
+                                  const day = timestamp.getDate();
                                   const hours = String(timestamp.getHours()).padStart(2, '0');
                                   const minutes = String(timestamp.getMinutes()).padStart(2, '0');
 
                                   return `${month}/${day} ${hours}:${minutes}`;
                                 } catch (e) {
-                                  return '시간 정보 없음';
+                                  return '-';
                                 }
-                              })()}
-                              {' • '}
-                              ✔️ 종료
-                            </CardDescription>
+                              })()}</span>
+                              <Button
+                                onClick={() => setSelectedGameId(game.id)}
+                                variant="outline"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                              >
+                                기록 보기
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="text-center">
-                            <div className="text-sm text-muted-foreground">{game.teamA.name}</div>
-                            <div className="text-3xl font-bold text-blue-600">{game.scoreBoard.teamATotal}</div>
-                          </div>
-                          <div className="text-2xl font-bold text-muted-foreground">:</div>
-                          <div className="text-center">
-                            <div className="text-sm text-muted-foreground">{game.teamB.name}</div>
-                            <div className="text-3xl font-bold text-red-600">{game.scoreBoard.teamBTotal}</div>
-                          </div>
-                        </div>
-                        <Button
-                          onClick={() => setSelectedGameId(game.id)}
-                          variant="outline"
-                          className="w-full"
-                        >
-                          경기 기록 보기
-                        </Button>
-                      </CardContent>
                     </Card>
                   ))}
                 </div>

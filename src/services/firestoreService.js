@@ -860,6 +860,47 @@ class FirestoreService {
     }
   }
 
+  /**
+   * 선수의 특정 배지 삭제
+   * @param {string} playerId - 선수 ID
+   * @param {string} badgeId - 삭제할 배지 ID
+   * @returns {Promise<void>}
+   */
+  async removePlayerBadge(playerId, badgeId) {
+    try {
+      // 1. 현재 선수의 배지 데이터 가져오기
+      const badgeRef = this.getUserDoc('playerBadges', playerId);
+      const badgeDoc = await getDoc(badgeRef);
+
+      if (!badgeDoc.exists()) {
+        console.warn(`⚠️ ${playerId}의 배지 데이터가 없습니다.`);
+        return;
+      }
+
+      const badgeData = badgeDoc.data();
+      const currentBadges = badgeData.badges || [];
+
+      // 2. 배지 배열에서 해당 배지 제거
+      const updatedBadges = currentBadges.filter(id => id !== badgeId);
+
+      if (updatedBadges.length === currentBadges.length) {
+        console.warn(`⚠️ ${playerId}는 ${badgeId} 배지를 가지고 있지 않습니다.`);
+        return;
+      }
+
+      // 3. Firestore 업데이트
+      await updateDoc(badgeRef, {
+        badges: updatedBadges,
+        updatedAt: serverTimestamp()
+      });
+
+      console.log(`✅ 배지 삭제 완료: ${playerId}의 ${badgeId} 배지 제거`);
+    } catch (error) {
+      console.error('❌ 배지 삭제 실패:', error);
+      throw new Error('배지 삭제에 실패했습니다.');
+    }
+  }
+
   // ============================================
   // 선수 히스토리 관리
   // ============================================

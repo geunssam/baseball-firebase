@@ -92,8 +92,8 @@ const StatsView = ({ finishedGames, teams, onBack }) => {
 
               <div className="space-y-4">
                 {[...finishedGames].reverse().map((game, idx) => {
-                  const scoreA = game.scoreboard?.teamA?.reduce((a, b) => a + b, 0) || 0;
-                  const scoreB = game.scoreboard?.teamB?.reduce((a, b) => a + b, 0) || 0;
+                  const scoreA = game.scoreBoard?.teamA?.reduce((a, b) => a + b, 0) || 0;
+                  const scoreB = game.scoreBoard?.teamB?.reduce((a, b) => a + b, 0) || 0;
                   const winner = scoreA > scoreB ? 'A' : scoreA < scoreB ? 'B' : 'draw';
 
                   // 각 경기의 MVP 계산 (공동 MVP 지원)
@@ -113,124 +113,145 @@ const StatsView = ({ finishedGames, teams, onBack }) => {
                   return (
                     <details
                       key={game.id || idx}
-                      className="border-2 border-gray-300 rounded-xl bg-gradient-to-br from-gray-50 to-white hover:shadow-lg transition-shadow"
+                      className="border-2 border-gray-300 rounded-lg bg-white hover:shadow transition-shadow group"
                     >
-                      <summary className="cursor-pointer p-5 hover:bg-gray-100 rounded-xl transition-colors">
-                        <div className="flex justify-between items-center">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h3 className="text-xl font-bold">
-                                {game.teamA?.name} <span className="text-gray-400">vs</span> {game.teamB?.name}
-                              </h3>
-                              {winner !== 'draw' && (
-                                <span className="bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-sm font-bold">
-                                  🏆 {winner === 'A' ? game.teamA?.name : game.teamB?.name} 승리
-                                </span>
-                              )}
-                              {winner === 'draw' && (
-                                <span className="bg-gray-400 text-white px-3 py-1 rounded-full text-sm font-bold">
-                                  무승부
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="flex gap-4 text-sm text-gray-600 flex-wrap">
-                              <span>🏁 시작: {(() => {
-                                try {
-                                  const createdAt = game.createdAt;
-                                  let timestamp;
-
-                                  if (typeof createdAt === 'string') {
-                                    // ISO 문자열
-                                    timestamp = new Date(createdAt);
-                                  } else if (createdAt?.toMillis) {
-                                    // Firestore Timestamp
-                                    timestamp = new Date(createdAt.toMillis());
-                                  } else if (createdAt?.seconds) {
-                                    // Firestore Timestamp 객체 형태
-                                    timestamp = new Date(createdAt.seconds * 1000);
-                                  } else if (typeof createdAt === 'number') {
-                                    // 밀리초
-                                    timestamp = new Date(createdAt);
-                                  } else {
-                                    timestamp = new Date();
-                                  }
-
-                                  return timestamp.toLocaleString('ko-KR', {
-                                    year: 'numeric',
-                                    month: 'long',
-                                    day: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  });
-                                } catch (e) {
-                                  return '시간 정보 없음';
-                                }
-                              })()}</span>
-                              {game.finishedAt && (
-                                <span>✅ 종료: {(() => {
-                                  try {
-                                    const finishedAt = game.finishedAt;
-                                    let timestamp;
-
-                                    if (typeof finishedAt === 'string') {
-                                      timestamp = new Date(finishedAt);
-                                    } else if (finishedAt?.toMillis) {
-                                      timestamp = new Date(finishedAt.toMillis());
-                                    } else if (finishedAt?.seconds) {
-                                      timestamp = new Date(finishedAt.seconds * 1000);
-                                    } else if (typeof finishedAt === 'number') {
-                                      timestamp = new Date(finishedAt);
-                                    } else {
-                                      timestamp = new Date();
-                                    }
-
-                                    return timestamp.toLocaleString('ko-KR', {
-                                      year: 'numeric',
-                                      month: 'long',
-                                      day: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    });
-                                  } catch (e) {
-                                    return '시간 정보 없음';
-                                  }
-                                })()}</span>
-                              )}
-                              <span>⚾ {game.innings || 3}회 진행</span>
-                            </div>
+                      <summary className="cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition-colors list-none">
+                        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+                          {/* 폴딩 아이콘 */}
+                          <div className="flex-shrink-0 text-gray-400 group-open:rotate-90 transition-transform">
+                            ▶
                           </div>
 
-                          <div className="flex items-center gap-4">
-                            <div className="text-3xl font-black">
-                              <span className={winner === 'A' ? 'text-blue-600' : 'text-gray-600'}>{scoreA}</span>
-                              <span className="text-gray-400 mx-2">:</span>
-                              <span className={winner === 'B' ? 'text-red-600' : 'text-gray-600'}>{scoreB}</span>
-                            </div>
+                          {/* 팀명과 점수 (테이블 형식 고정) */}
+                          <div className="flex items-center gap-1">
+                            <span className="font-semibold text-sm w-16 text-center truncate" title={game.teamA?.name}>
+                              {game.teamA?.name}
+                            </span>
+                            <span className={`font-bold text-lg w-6 text-center ${winner === 'A' ? 'text-blue-600' : 'text-gray-600'}`}>
+                              {scoreA}
+                            </span>
+                            <span className="text-gray-400 text-xs w-3 text-center">:</span>
+                            <span className={`font-bold text-lg w-6 text-center ${winner === 'B' ? 'text-red-600' : 'text-gray-600'}`}>
+                              {scoreB}
+                            </span>
+                            <span className="font-semibold text-sm w-16 text-center truncate" title={game.teamB?.name}>
+                              {game.teamB?.name}
+                            </span>
+                          </div>
+
+                          {/* 날짜/시간 정보 (고정 너비) */}
+                          <div className="flex items-center gap-2 text-xs text-gray-600">
+                            <span className="inline-flex items-center gap-0.5 w-16">
+                              <span>📅</span>
+                              <span>{(() => {
+                              try {
+                                const createdAt = game.createdAt;
+                                let timestamp;
+                                if (typeof createdAt === 'string') {
+                                  timestamp = new Date(createdAt);
+                                } else if (createdAt?.toMillis) {
+                                  timestamp = new Date(createdAt.toMillis());
+                                } else if (createdAt?.seconds) {
+                                  timestamp = new Date(createdAt.seconds * 1000);
+                                } else if (typeof createdAt === 'number') {
+                                  timestamp = new Date(createdAt);
+                                } else {
+                                  timestamp = new Date();
+                                }
+                                return `${timestamp.getMonth() + 1}/${timestamp.getDate()}`;
+                              } catch (e) {
+                                return '-';
+                              }
+                            })()}</span>
+                            </span>
+                            <span className="inline-flex items-center gap-0.5 w-16">
+                              <span>🏁</span>
+                              <span>{(() => {
+                              try {
+                                const createdAt = game.createdAt;
+                                let timestamp;
+                                if (typeof createdAt === 'string') {
+                                  timestamp = new Date(createdAt);
+                                } else if (createdAt?.toMillis) {
+                                  timestamp = new Date(createdAt.toMillis());
+                                } else if (createdAt?.seconds) {
+                                  timestamp = new Date(createdAt.seconds * 1000);
+                                } else if (typeof createdAt === 'number') {
+                                  timestamp = new Date(createdAt);
+                                } else {
+                                  timestamp = new Date();
+                                }
+                                return timestamp.toLocaleTimeString('ko-KR', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  hour12: false
+                                });
+                              } catch (e) {
+                                return '-';
+                              }
+                            })()}</span>
+                            </span>
+                            <span className="inline-flex items-center gap-0.5 w-16">
+                              {game.finishedAt ? (
+                                <>
+                                  <span>✅</span>
+                                  <span>{(() => {
+                                    try {
+                                      const finishedAt = game.finishedAt;
+                                      let timestamp;
+                                      if (typeof finishedAt === 'string') {
+                                        timestamp = new Date(finishedAt);
+                                      } else if (finishedAt?.toMillis) {
+                                        timestamp = new Date(finishedAt.toMillis());
+                                      } else if (finishedAt?.seconds) {
+                                        timestamp = new Date(finishedAt.seconds * 1000);
+                                      } else if (typeof finishedAt === 'number') {
+                                        timestamp = new Date(finishedAt);
+                                      } else {
+                                        timestamp = new Date();
+                                      }
+                                      return timestamp.toLocaleTimeString('ko-KR', {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        hour12: false
+                                      });
+                                    } catch (e) {
+                                      return '-';
+                                    }
+                                  })()}</span>
+                                </>
+                              ) : (
+                                <span></span>
+                              )}
+                            </span>
+                            <span className="inline-flex items-center gap-0.5 w-16">
+                              <span>⚾</span>
+                              <span>{game.innings || 3}이닝</span>
+                            </span>
                           </div>
                         </div>
                       </summary>
 
                       {/* 상세 내용 */}
-                      <div className="p-5 pt-0 space-y-4" onClick={(e) => e.stopPropagation()}>
+                      <div className="p-2 pt-0 space-y-2" onClick={(e) => e.stopPropagation()}>
                         {/* MVP 정보 (공동 MVP 지원) */}
                         {gameMVPs.length > 0 && (
-                          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-3">
-                            <div className="text-sm text-yellow-800 font-semibold mb-2 flex items-center gap-2">
-                              <span className="text-2xl">👑</span>
+                          <div className="bg-yellow-50 border border-yellow-300 rounded p-2">
+                            <div className="text-xs text-yellow-800 font-semibold mb-1 flex items-center gap-1">
+                              <span className="text-lg">👑</span>
                               <span>
-                                {gameMVPs.length === 1 ? '이 경기 MVP' : `이 경기 공동 MVP (${gameMVPs.length}명)`}
+                                {gameMVPs.length === 1 ? '이 경기 MVP' : `공동 MVP (${gameMVPs.length}명)`}
                               </span>
                             </div>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-1">
                               {gameMVPs.map((mvp, idx) => (
-                                <div key={idx} className="bg-white rounded-lg px-3 py-2 shadow-sm flex-1 min-w-[200px]">
-                                  <div className="font-bold text-yellow-900 mb-1">{mvp.name}</div>
-                                  <div className="text-xs text-gray-600 flex items-center gap-2">
-                                    <span>⚾ {mvp.stats?.hits || 0}</span>
-                                    <span>🏃 {mvp.stats?.runs || 0}</span>
-                                    <span>🛡️ {mvp.stats?.goodDefense || 0}</span>
-                                    <span>🍪 {mvp.stats?.bonusCookie || 0}</span>
+                                <div key={idx} className="bg-white rounded px-2 py-1 shadow-sm flex-1 min-w-[150px]">
+                                  <div className="font-semibold text-yellow-900 text-xs mb-0.5">{mvp.name}</div>
+                                  <div className="text-xs text-gray-600 flex items-center gap-1">
+                                    <span>⚾{mvp.stats?.hits || 0}</span>
+                                    <span>🏃{mvp.stats?.runs || 0}</span>
+                                    <span>🛡️{mvp.stats?.goodDefense || 0}</span>
+                                    <span>🍪{mvp.stats?.bonusCookie || 0}</span>
                                     <span className="ml-auto font-bold text-orange-600">{mvp.totalPoints}점</span>
                                   </div>
                                 </div>
@@ -240,34 +261,34 @@ const StatsView = ({ finishedGames, teams, onBack }) => {
                         )}
 
                         {/* 이닝별 점수 */}
-                        <details className="mt-4">
-                          <summary className="text-sm text-blue-600 cursor-pointer hover:text-blue-800 font-semibold">
+                        <details className="mt-2">
+                          <summary className="text-xs text-blue-600 cursor-pointer hover:text-blue-800 font-semibold">
                             📊 이닝별 점수 보기
                           </summary>
-                          <table className="w-full text-center border-collapse text-sm mt-2">
+                          <table className="w-full text-center border-collapse text-xs mt-1">
                             <thead className="bg-gray-100">
                               <tr>
-                                <th className="border border-gray-300 p-2">팀</th>
+                                <th className="border border-gray-300 p-1">팀</th>
                                 {Array.from({ length: game.innings }, (_, i) => (
-                                  <th key={i} className="border border-gray-300 p-2">{i + 1}회</th>
+                                  <th key={i} className="border border-gray-300 p-1">{i + 1}회</th>
                                 ))}
-                                <th className="border border-gray-300 p-2 bg-yellow-100">총점</th>
+                                <th className="border border-gray-300 p-1 bg-yellow-100">총점</th>
                               </tr>
                             </thead>
                             <tbody>
                               <tr className={winner === 'A' ? 'bg-blue-50' : ''}>
-                                <td className="border border-gray-300 p-2 font-semibold">{game.teamA?.name}</td>
-                                {game.scoreboard?.teamA?.map((s, i) => (
-                                  <td key={i} className="border border-gray-300 p-2">{s}</td>
+                                <td className="border border-gray-300 p-1 font-semibold">{game.teamA?.name}</td>
+                                {game.scoreBoard?.teamA?.map((s, i) => (
+                                  <td key={i} className="border border-gray-300 p-1">{s}</td>
                                 ))}
-                                <td className="border border-gray-300 p-2 font-bold">{scoreA}</td>
+                                <td className="border border-gray-300 p-1 font-bold">{scoreA}</td>
                               </tr>
                               <tr className={winner === 'B' ? 'bg-red-50' : ''}>
-                                <td className="border border-gray-300 p-2 font-semibold">{game.teamB?.name}</td>
-                                {game.scoreboard?.teamB?.map((s, i) => (
-                                  <td key={i} className="border border-gray-300 p-2">{s}</td>
+                                <td className="border border-gray-300 p-1 font-semibold">{game.teamB?.name}</td>
+                                {game.scoreBoard?.teamB?.map((s, i) => (
+                                  <td key={i} className="border border-gray-300 p-1">{s}</td>
                                 ))}
-                                <td className="border border-gray-300 p-2 font-bold">{scoreB}</td>
+                                <td className="border border-gray-300 p-1 font-bold">{scoreB}</td>
                               </tr>
                             </tbody>
                           </table>
@@ -320,22 +341,65 @@ const StatsView = ({ finishedGames, teams, onBack }) => {
                 {/* 경기 카드 리스트 (가로 1열, 최신순) */}
                 <div className="space-y-3 max-h-[600px] overflow-y-auto p-2">
                   {[...finishedGames].reverse().map(game => {
-                    const scoreA = game.scoreboard?.teamA?.reduce((a, b) => a + b, 0) || 0;
-                    const scoreB = game.scoreboard?.teamB?.reduce((a, b) => a + b, 0) || 0;
+                    const scoreA = game.scoreBoard?.teamA?.reduce((a, b) => a + b, 0) || 0;
+                    const scoreB = game.scoreBoard?.teamB?.reduce((a, b) => a + b, 0) || 0;
                     const winner = scoreA > scoreB ? 'A' : scoreA < scoreB ? 'B' : 'draw';
                     const isSelected = selectedGameIds.includes(game.id);
 
-                    const gameDate = game.startTime ? new Date(game.startTime) :
-                                    game.createdAt ? new Date(game.createdAt) : new Date();
-                    const dateStr = gameDate.toLocaleDateString('ko-KR', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    });
+                    // 시작 시간
+                    let gameDate;
+                    try {
+                      const createdAt = game.createdAt;
+                      if (typeof createdAt === 'string') {
+                        gameDate = new Date(createdAt);
+                      } else if (createdAt?.toMillis) {
+                        gameDate = new Date(createdAt.toMillis());
+                      } else if (createdAt?.seconds) {
+                        gameDate = new Date(createdAt.seconds * 1000);
+                      } else if (typeof createdAt === 'number') {
+                        gameDate = new Date(createdAt);
+                      } else {
+                        gameDate = new Date();
+                      }
+                    } catch (e) {
+                      gameDate = new Date();
+                    }
+
+                    const dateStr = `${gameDate.getMonth() + 1}/${gameDate.getDate()}`;
                     const timeStr = gameDate.toLocaleTimeString('ko-KR', {
                       hour: '2-digit',
-                      minute: '2-digit'
+                      minute: '2-digit',
+                      hour12: false
                     });
+
+                    // 종료 시간
+                    let finishedTimeStr = null;
+                    if (game.finishedAt) {
+                      try {
+                        const finishedAt = game.finishedAt;
+                        let timestamp;
+
+                        if (typeof finishedAt === 'string') {
+                          timestamp = new Date(finishedAt);
+                        } else if (finishedAt?.toMillis) {
+                          timestamp = new Date(finishedAt.toMillis());
+                        } else if (finishedAt?.seconds) {
+                          timestamp = new Date(finishedAt.seconds * 1000);
+                        } else if (typeof finishedAt === 'number') {
+                          timestamp = new Date(finishedAt);
+                        } else {
+                          timestamp = new Date();
+                        }
+
+                        finishedTimeStr = timestamp.toLocaleTimeString('ko-KR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: false
+                        });
+                      } catch (e) {
+                        finishedTimeStr = null;
+                      }
+                    }
 
                     return (
                       <div
@@ -348,70 +412,67 @@ const StatsView = ({ finishedGames, teams, onBack }) => {
                           }
                         }}
                         className={`
-                          border-4 rounded-xl p-4 cursor-pointer transition-all transform hover:scale-[1.01]
-                          flex items-center justify-between gap-4
+                          border-2 rounded-lg p-2 cursor-pointer transition-all
+                          grid grid-cols-[1fr_auto_auto] items-center gap-3
                           ${isSelected
-                            ? 'border-blue-500 bg-blue-50 shadow-lg'
-                            : 'border-gray-300 bg-white hover:border-blue-300 hover:shadow-md'
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-300 bg-white hover:border-blue-300'
                           }
                         `}
                       >
-                        {/* 왼쪽: 경기 정보 */}
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-bold text-lg">
-                              {game.teamA?.name || '팀A'} vs {game.teamB?.name || '팀B'}
-                            </h3>
-                            <div className="text-2xl font-black">
-                              <span className={winner === 'A' ? 'text-blue-600' : 'text-gray-600'}>{scoreA}</span>
-                              <span className="text-gray-400 mx-1">:</span>
-                              <span className={winner === 'B' ? 'text-red-600' : 'text-gray-600'}>{scoreB}</span>
-                            </div>
-                          </div>
+                        {/* 왼쪽: 팀명과 점수 (테이블 형식 고정) */}
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold text-sm w-16 text-center truncate" title={game.teamA?.name || '팀A'}>
+                            {game.teamA?.name || '팀A'}
+                          </span>
+                          <span className={`font-bold text-lg w-6 text-center ${winner === 'A' ? 'text-blue-600' : 'text-gray-600'}`}>
+                            {scoreA}
+                          </span>
+                          <span className="text-gray-400 text-xs w-3 text-center">:</span>
+                          <span className={`font-bold text-lg w-6 text-center ${winner === 'B' ? 'text-red-600' : 'text-gray-600'}`}>
+                            {scoreB}
+                          </span>
+                          <span className="font-semibold text-sm w-16 text-center truncate" title={game.teamB?.name || '팀B'}>
+                            {game.teamB?.name || '팀B'}
+                          </span>
+                        </div>
 
-                          <div className="flex items-center gap-2 mb-2">
-                            {winner === 'A' && (
-                              <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold">
-                                🏆 {game.teamA?.name} 승리
-                              </span>
+                        {/* 중앙: 날짜/시간 정보 (고정 너비) */}
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <span className="inline-flex items-center gap-0.5 w-16">
+                            <span>📅</span>
+                            <span>{dateStr}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-0.5 w-16">
+                            <span>🏁</span>
+                            <span>{timeStr}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-0.5 w-16">
+                            {finishedTimeStr ? (
+                              <>
+                                <span>✅</span>
+                                <span>{finishedTimeStr}</span>
+                              </>
+                            ) : (
+                              <span></span>
                             )}
-                            {winner === 'B' && (
-                              <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-bold">
-                                🏆 {game.teamB?.name} 승리
-                              </span>
-                            )}
-                            {winner === 'draw' && (
-                              <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-bold">
-                                ⚖ 무승부
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
-                            <div className="flex items-center gap-1">
-                              <span>📅</span>
-                              <span>{dateStr}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span>🕐</span>
-                              <span>{timeStr}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span>⚾</span>
-                              <span>{game.innings || 3}이닝</span>
-                            </div>
-                          </div>
+                          </span>
+                          <span className="inline-flex items-center gap-0.5 w-16">
+                            <span>⚾</span>
+                            <span>{game.innings || 3}이닝</span>
+                          </span>
                         </div>
 
                         {/* 오른쪽: 선택 아이콘 */}
                         <div className="flex-shrink-0">
-                          {isSelected ? (
-                            <span className="text-4xl animate-bounce">✅</span>
-                          ) : (
-                            <div className="w-12 h-12 border-4 border-gray-300 rounded-lg flex items-center justify-center text-gray-400">
-                              ☐
-                            </div>
-                          )}
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                            }}
+                            className="w-5 h-5 cursor-pointer"
+                          />
                         </div>
                       </div>
                     );
