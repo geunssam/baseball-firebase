@@ -46,6 +46,10 @@ const MainApp = () => {
   // 학생 코드 모달 상태
   const [showStudentCodeModal, setShowStudentCodeModal] = useState(false);
 
+  // 경기 기록 모달 상태
+  const [showGameRecordModal, setShowGameRecordModal] = useState(false);
+  const [selectedRecordGameId, setSelectedRecordGameId] = useState(null);
+
   // 현재 날짜/시간 업데이트
   useEffect(() => {
     const timer = setInterval(() => {
@@ -261,6 +265,21 @@ const MainApp = () => {
     }
   };
 
+  // 개별 완료된 경기 삭제 핸들러
+  const handleDeleteCompletedGame = async (game) => {
+    if (!confirm(`"${game.teamA.name} vs ${game.teamB.name}" 경기를 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    try {
+      await deleteGame(game.id);
+      alert('✅ 경기가 삭제되었습니다.');
+    } catch (error) {
+      console.error('❌ 경기 삭제 실패:', error);
+      alert('❌ 경기 삭제에 실패했습니다: ' + error.message);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -285,14 +304,14 @@ const MainApp = () => {
           <div className="flex justify-between items-center h-14 tablet:h-16 tablet-lg:h-20">
             {/* 좌측: 타이틀 */}
             <div className="flex items-center gap-2 tablet:gap-3">
-              <span className="text-2xl tablet:text-3xl tablet-lg:text-4xl">⚾</span>
-              <h1 className="text-sm tablet:text-lg tablet-lg:text-xl font-bold text-card-foreground">
+              <span className="text-3xl tablet:text-4xl tablet-lg:text-5xl">⚾</span>
+              <h1 className="text-xl tablet:text-3xl tablet-lg:text-4xl font-bold text-card-foreground">
                 필드형 게임 마스터 보드
               </h1>
             </div>
 
-            {/* 중앙: 날짜/시간 - 태블릿 가로모드에서만 표시 */}
-            <div className="hidden tablet-lg:flex flex-1 justify-center">
+            {/* 중앙: 날짜/시간 */}
+            <div className="flex flex-1 justify-center">
               <div className="flex items-center gap-2 tablet-lg:gap-3 px-3 tablet-lg:px-4 py-1.5 tablet-lg:py-2 bg-lime-50 text-gray-800 font-semibold rounded-full shadow-sm border border-lime-200">
                 <div className="flex items-center gap-1">
                   <span className="text-base tablet-lg:text-lg">📆</span>
@@ -360,89 +379,125 @@ const MainApp = () => {
         {/* 대시보드 뷰 */}
         {dashboardView === 'dashboard' && (
           <div>
-            <h2 className="text-2xl tablet:text-3xl font-bold text-foreground mb-4 tablet:mb-8">대시보드</h2>
             <div className="grid grid-cols-2 tablet-lg:grid-cols-4 gap-3 tablet:gap-4 tablet-lg:gap-6">
               {/* 학급/팀 관리 카드 */}
               <Card
-                className="cursor-pointer hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200"
+                className="cursor-pointer hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 w-full h-[280px] flex-shrink-0"
                 onClick={() => setDashboardView('teams')}
               >
-                <CardHeader className="p-3 tablet:p-4 tablet-lg:p-6">
-                  <div className="text-4xl tablet:text-5xl tablet-lg:text-6xl mb-2">👥</div>
-                  <CardTitle className="text-base tablet:text-lg tablet-lg:text-xl">학급/팀 관리</CardTitle>
-                  <CardDescription className="text-xs tablet:text-sm">팀 생성 및 선수 관리</CardDescription>
-                </CardHeader>
-                <CardContent className="p-3 tablet:p-4 tablet-lg:p-6 pt-0">
-                  <p className="text-2xl tablet:text-3xl font-bold text-blue-600">{teams.length}</p>
-                  <p className="text-xs tablet:text-sm text-muted-foreground">개 팀</p>
+                <CardContent className="p-6 tablet:p-8 tablet-lg:p-10 h-full flex flex-col justify-center items-center text-center gap-2 overflow-hidden !pt-6 tablet:!pt-8 tablet-lg:!pt-10">
+                  {/* 제목 영역 - 가로 배치 */}
+                  <div className="flex items-center justify-center gap-4 w-full">
+                    <div className="text-5xl tablet:text-6xl tablet-lg:text-7xl">👥</div>
+                    <div className="text-3xl tablet:text-4xl tablet-lg:text-5xl font-extrabold text-foreground">
+                      학급 / 팀 관리
+                    </div>
+                  </div>
+
+                  {/* 설명 */}
+                  <p className="text-xl tablet:text-2xl tablet-lg:text-3xl font-bold text-gray-900">
+                    학급 및 팀 설정, 학생 관리
+                  </p>
+
+                  {/* 통계 정보 - 배지 스타일 */}
+                  <div className="flex flex-wrap gap-3 justify-center">
+                    <span className="px-5 py-2.5 bg-blue-100/80 rounded-lg font-semibold text-blue-800 text-lg tablet:text-xl">
+                      {new Set(students.map(s => s.className)).size}개 학급
+                    </span>
+                    <span className="px-5 py-2.5 bg-green-100/80 rounded-lg font-semibold text-green-800 text-lg tablet:text-xl">
+                      {students.length}명 학생
+                    </span>
+                    <span className="px-5 py-2.5 bg-purple-100/80 rounded-lg font-semibold text-purple-800 text-lg tablet:text-xl">
+                      {teams.length}개 팀
+                    </span>
+                  </div>
                 </CardContent>
               </Card>
 
               {/* 경기 관리 카드 */}
               <Card
-                className="cursor-pointer hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-br from-green-50 to-green-100 border-green-200"
+                className="cursor-pointer hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-br from-green-50 to-green-100 border-green-200 w-full h-[280px] flex-shrink-0"
                 onClick={() => setDashboardView('games')}
               >
-                <CardHeader className="p-3 tablet:p-4 tablet-lg:p-6">
-                  <div className="text-4xl tablet:text-5xl tablet-lg:text-6xl mb-2">⚾</div>
-                  <CardTitle className="text-base tablet:text-lg tablet-lg:text-xl">경기 관리</CardTitle>
-                  <CardDescription className="text-xs tablet:text-sm">진행 중 및 완료된 경기</CardDescription>
-                </CardHeader>
-                <CardContent className="p-3 tablet:p-4 tablet-lg:p-6 pt-0">
-                  <div className="flex gap-4">
-                    <div>
-                      <p className="text-xl tablet:text-2xl font-bold text-green-600">{playingGames.length}</p>
-                      <p className="text-xs text-muted-foreground">진행 중</p>
+                <CardContent className="p-6 tablet:p-8 tablet-lg:p-10 h-full flex flex-col justify-center items-center text-center gap-2 overflow-hidden !pt-6 tablet:!pt-8 tablet-lg:!pt-10">
+                  {/* 제목 영역 */}
+                  <div className="flex items-center justify-center gap-4 w-full">
+                    <div className="text-5xl tablet:text-6xl tablet-lg:text-7xl">⚾</div>
+                    <div className="text-3xl tablet:text-4xl tablet-lg:text-5xl font-extrabold text-foreground">
+                      경기 관리
                     </div>
-                    <div>
-                      <p className="text-xl tablet:text-2xl font-bold text-gray-600">{completedGames.length}</p>
-                      <p className="text-xs text-muted-foreground">완료</p>
-                    </div>
+                  </div>
+
+                  {/* 설명 */}
+                  <p className="text-xl tablet:text-2xl tablet-lg:text-3xl font-bold text-gray-900">
+                    진행 중 및 완료된 경기
+                  </p>
+
+                  {/* 통계 정보 */}
+                  <div className="flex flex-wrap gap-3 justify-center">
+                    <span className="px-5 py-2.5 bg-green-100/80 rounded-lg font-semibold text-green-800 text-lg tablet:text-xl">
+                      {playingGames.length}개 진행 중
+                    </span>
+                    <span className="px-5 py-2.5 bg-gray-100/80 rounded-lg font-semibold text-gray-800 text-lg tablet:text-xl">
+                      {completedGames.length}개 완료
+                    </span>
                   </div>
                 </CardContent>
               </Card>
 
               {/* 통계 카드 */}
               <Card
-                className="cursor-pointer hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200"
+                className="cursor-pointer hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 w-full h-[280px] flex-shrink-0"
                 onClick={() => setDashboardView('stats')}
               >
-                <CardHeader className="p-3 tablet:p-4 tablet-lg:p-6">
-                  <div className="text-4xl tablet:text-5xl tablet-lg:text-6xl mb-2">📊</div>
-                  <CardTitle className="text-base tablet:text-lg tablet-lg:text-xl">통합 통계</CardTitle>
-                  <CardDescription className="text-xs tablet:text-sm">완료된 경기 통합 스탯</CardDescription>
-                </CardHeader>
-                <CardContent className="p-3 tablet:p-4 tablet-lg:p-6 pt-0">
-                  <p className="text-2xl tablet:text-3xl font-bold text-purple-600">{completedGames.length}</p>
-                  <p className="text-xs tablet:text-sm text-muted-foreground">개 완료 경기</p>
+                <CardContent className="p-6 tablet:p-8 tablet-lg:p-10 h-full flex flex-col justify-center items-center text-center gap-2 overflow-hidden !pt-6 tablet:!pt-8 tablet-lg:!pt-10">
+                  {/* 제목 영역 */}
+                  <div className="flex items-center justify-center gap-4 w-full">
+                    <div className="text-5xl tablet:text-6xl tablet-lg:text-7xl">📊</div>
+                    <div className="text-3xl tablet:text-4xl tablet-lg:text-5xl font-extrabold text-foreground">
+                      통합 통계
+                    </div>
+                  </div>
+
+                  {/* 설명 */}
+                  <p className="text-xl tablet:text-2xl tablet-lg:text-3xl font-bold text-gray-900">
+                    완료된 경기 통합 스탯
+                  </p>
+
+                  {/* 통계 정보 */}
+                  <div className="flex flex-wrap gap-3 justify-center">
+                    <span className="px-5 py-2.5 bg-purple-100/80 rounded-lg font-semibold text-purple-800 text-lg tablet:text-xl">
+                      {completedGames.length}개 완료 경기
+                    </span>
+                  </div>
                 </CardContent>
               </Card>
 
               {/* 배지 도감 카드 */}
               <Card
-                className="cursor-pointer hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-br from-yellow-50 to-amber-100 border-yellow-200"
+                className="cursor-pointer hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-br from-yellow-50 to-amber-100 border-yellow-200 w-full h-[280px] flex-shrink-0"
                 onClick={() => setDashboardView('badges')}
               >
-                <CardHeader className="p-3 tablet:p-4 tablet-lg:p-6">
-                  <div className="text-4xl tablet:text-5xl tablet-lg:text-6xl mb-2">🏆</div>
-                  <CardTitle className="text-base tablet:text-lg tablet-lg:text-xl">배지 도감</CardTitle>
-                  <CardDescription className="text-xs tablet:text-sm">획득 가능한 모든 배지</CardDescription>
-                </CardHeader>
-                <CardContent className="p-3 tablet:p-4 tablet-lg:p-6 pt-0">
-                  <p className="text-2xl tablet:text-3xl font-bold text-amber-600">📖</p>
-                  <p className="text-xs tablet:text-sm text-muted-foreground">배지 컬렉션</p>
-                </CardContent>
-              </Card>
+                <CardContent className="p-6 tablet:p-8 tablet-lg:p-10 h-full flex flex-col justify-center items-center text-center gap-2 overflow-hidden !pt-6 tablet:!pt-8 tablet-lg:!pt-10">
+                  {/* 제목 영역 */}
+                  <div className="flex items-center justify-center gap-4 w-full">
+                    <div className="text-5xl tablet:text-6xl tablet-lg:text-7xl">🏆</div>
+                    <div className="text-3xl tablet:text-4xl tablet-lg:text-5xl font-extrabold text-foreground">
+                      배지 도감
+                    </div>
+                  </div>
 
-              {/* 설정 카드 (향후 구현) */}
-              <Card className="cursor-not-allowed opacity-50 bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-                <CardHeader className="p-3 tablet:p-4 tablet-lg:p-6">
-                  <div className="text-4xl tablet:text-5xl tablet-lg:text-6xl mb-2">⚙️</div>
-                  <CardTitle className="text-base tablet:text-lg tablet-lg:text-xl">설정</CardTitle>
-                  <CardDescription className="text-xs tablet:text-sm">앱 설정 및 환경설정</CardDescription>
-                </CardHeader>
-                <CardContent className="p-3 tablet:p-4 tablet-lg:p-6 pt-0">
-                  <p className="text-xs tablet:text-sm text-muted-foreground">준비 중...</p>
+                  {/* 설명 */}
+                  <p className="text-xl tablet:text-2xl tablet-lg:text-3xl font-bold text-gray-900">
+                    획득 가능한 모든 배지
+                  </p>
+
+                  {/* 통계 정보 */}
+                  <div className="flex flex-wrap gap-3 justify-center">
+                    <span className="px-5 py-2.5 bg-amber-100/80 rounded-lg font-semibold text-amber-800 text-lg tablet:text-xl">
+                      📖 배지 컬렉션
+                    </span>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -495,80 +550,107 @@ const MainApp = () => {
         {playingGames.length > 0 ? (
           <div className="mb-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {playingGames.map((game) => (
-                <Card
-                  key={game.id}
-                  className="hover:shadow-lg transition-all duration-200 border-green-300 bg-green-50"
-                >
-                  <CardHeader className="text-center">
-                    <CardTitle className="text-lg text-black font-bold mb-1">
-                      ⚾ {game.teamA.name} vs {game.teamB.name}
-                    </CardTitle>
-                    <CardDescription className="text-sm text-gray-700 font-medium">
-                      📅 {game.createdAt && (() => {
-                        try {
-                          const createdAt = game.createdAt;
-                          let timestamp;
+              {playingGames.map((game) => {
+                // 날짜/시간 파싱
+                let dateTimeStr = '';
+                let inningStr = '';
 
-                          if (typeof createdAt === 'string') {
-                            timestamp = new Date(createdAt);
-                          } else if (createdAt?.toMillis) {
-                            timestamp = new Date(createdAt.toMillis());
-                          } else if (createdAt?.seconds) {
-                            timestamp = new Date(createdAt.seconds * 1000);
-                          } else if (typeof createdAt === 'number') {
-                            timestamp = new Date(createdAt);
-                          } else {
-                            timestamp = new Date();
-                          }
+                try {
+                  const createdAt = game.createdAt;
+                  let timestamp;
 
-                          const month = String(timestamp.getMonth() + 1).padStart(2, '0');
-                          const day = String(timestamp.getDate()).padStart(2, '0');
-                          const hours = String(timestamp.getHours()).padStart(2, '0');
-                          const minutes = String(timestamp.getMinutes()).padStart(2, '0');
+                  if (typeof createdAt === 'string') {
+                    timestamp = new Date(createdAt);
+                  } else if (createdAt?.toMillis) {
+                    timestamp = new Date(createdAt.toMillis());
+                  } else if (createdAt?.seconds) {
+                    timestamp = new Date(createdAt.seconds * 1000);
+                  } else if (typeof createdAt === 'number') {
+                    timestamp = new Date(createdAt);
+                  } else {
+                    timestamp = new Date();
+                  }
 
-                          return `${month}/${day} ${hours}:${minutes}`;
-                        } catch (e) {
-                          return '시간 정보 없음';
-                        }
-                      })()}
-                      {' • '}
-                      ▶️ {game.currentInning}회 {game.isTopInning ? '초' : '말'}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="text-center">
-                        <div className="text-sm text-muted-foreground">{game.teamA.name}</div>
-                        <div className="text-3xl font-bold text-blue-600">{game.scoreBoard.teamATotal}</div>
+                  const month = String(timestamp.getMonth() + 1).padStart(2, '0');
+                  const day = String(timestamp.getDate()).padStart(2, '0');
+                  const hours = String(timestamp.getHours()).padStart(2, '0');
+                  const minutes = String(timestamp.getMinutes()).padStart(2, '0');
+
+                  dateTimeStr = `${month}/${day} ${hours}:${minutes}`;
+                  inningStr = `${game.currentInning}회 ${game.isTopInning ? '초' : '말'}`;
+                } catch (e) {
+                  dateTimeStr = '정보 없음';
+                  inningStr = '-';
+                }
+
+                return (
+                  <Card
+                    key={game.id}
+                    className="hover:shadow-lg transition-all duration-200 border-2 border-green-300 bg-green-50"
+                  >
+                    <CardHeader className="p-3">
+                      <div className="flex flex-col gap-2">
+                        {/* 첫 번째 줄: 팀명과 점수 (중앙 정렬) */}
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="font-bold text-lg truncate" title={game.teamA?.name || '팀A'}>
+                            {game.teamA?.name || '팀A'}
+                          </span>
+                          <span className="font-bold text-xl text-blue-600">
+                            {game.scoreBoard?.teamATotal || 0}
+                          </span>
+                          <span className="text-gray-400 text-sm">:</span>
+                          <span className="font-bold text-xl text-red-600">
+                            {game.scoreBoard?.teamBTotal || 0}
+                          </span>
+                          <span className="font-bold text-lg truncate" title={game.teamB?.name || '팀B'}>
+                            {game.teamB?.name || '팀B'}
+                          </span>
+                        </div>
+
+                        {/* 두 번째 줄: 날짜/시간/이닝 + 버튼들 (가로 배치) */}
+                        <div className="flex items-center justify-between gap-1">
+                          {/* 날짜/시간/이닝 정보 */}
+                          <div className="flex items-center gap-2 text-sm text-gray-700">
+                            <span className="inline-flex items-center gap-1">
+                              <span>📅</span>
+                              <span>{dateTimeStr.split(' ')[0]}</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1">
+                              <span>🕐</span>
+                              <span>{dateTimeStr.split(' ')[1]}</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1">
+                              <span>▶️</span>
+                              <span>{inningStr}</span>
+                            </span>
+                          </div>
+
+                          {/* 버튼들 */}
+                          <div className="flex gap-1.5 items-center">
+                            <Button
+                              onClick={() => setSelectedGameId(game.id)}
+                              size="sm"
+                              className="h-7 px-3 text-xs bg-green-100 hover:bg-green-200 text-green-700 border-green-200 font-semibold"
+                            >
+                              경기 계속하기
+                            </Button>
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteInProgressGame(game);
+                              }}
+                              size="sm"
+                              className="h-7 px-2 text-xs bg-red-100 hover:bg-red-200 text-red-700 border-red-200"
+                            >
+                              🗑️
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-2xl font-bold text-muted-foreground">:</div>
-                      <div className="text-center">
-                        <div className="text-sm text-muted-foreground">{game.teamB.name}</div>
-                        <div className="text-3xl font-bold text-red-600">{game.scoreBoard.teamBTotal}</div>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => setSelectedGameId(game.id)}
-                        className="flex-1 bg-green-100 hover:bg-green-200 text-green-700 border-green-200"
-                      >
-                        경기 계속하기
-                      </Button>
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteInProgressGame(game);
-                        }}
-                        size="sm"
-                        className="bg-red-100 hover:bg-red-200 text-red-700 border-red-200"
-                      >
-                        🗑️
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardHeader>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         ) : (
@@ -617,76 +699,114 @@ const MainApp = () => {
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {completedGames.map((game) => (
-                    <Card
-                      key={game.id}
-                      className={`hover:shadow transition-all border-2 ${
-                        selectedCompletedGames.includes(game.id)
-                          ? 'bg-red-100 border-red-400'
-                          : 'bg-red-50 border-red-200'
-                      }`}
-                    >
-                      <CardHeader className="p-2">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedCompletedGames.includes(game.id)}
-                            onChange={() => handleToggleCompletedGame(game.id)}
-                            className="w-4 h-4 cursor-pointer flex-shrink-0"
-                          />
-                          <div className="flex-1 flex items-center justify-between">
-                            {/* 팀명과 점수 */}
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-sm">{game.teamA.name}</span>
-                              <span className="font-bold text-lg text-blue-600">{game.scoreBoard.teamATotal}</span>
-                              <span className="text-gray-400 text-xs">:</span>
-                              <span className="font-bold text-lg text-red-600">{game.scoreBoard.teamBTotal}</span>
-                              <span className="font-semibold text-sm">{game.teamB.name}</span>
+                  {completedGames.map((game) => {
+                    // 날짜/시간 파싱
+                    let dateTimeStr = '';
+                    try {
+                      const finishedAt = game.finishedAt || game.createdAt;
+                      let timestamp;
+
+                      if (typeof finishedAt === 'string') {
+                        timestamp = new Date(finishedAt);
+                      } else if (finishedAt?.toMillis) {
+                        timestamp = new Date(finishedAt.toMillis());
+                      } else if (finishedAt?.seconds) {
+                        timestamp = new Date(finishedAt.seconds * 1000);
+                      } else if (typeof finishedAt === 'number') {
+                        timestamp = new Date(finishedAt);
+                      } else {
+                        timestamp = new Date();
+                      }
+
+                      const month = String(timestamp.getMonth() + 1).padStart(2, '0');
+                      const day = String(timestamp.getDate()).padStart(2, '0');
+                      const hours = String(timestamp.getHours()).padStart(2, '0');
+                      const minutes = String(timestamp.getMinutes()).padStart(2, '0');
+
+                      dateTimeStr = `${month}/${day} ${hours}:${minutes}`;
+                    } catch (e) {
+                      dateTimeStr = '정보 없음';
+                    }
+
+                    return (
+                      <Card
+                        key={game.id}
+                        className={`hover:shadow-lg transition-all duration-200 border-2 ${
+                          selectedCompletedGames.includes(game.id)
+                            ? 'bg-red-100 border-red-400'
+                            : 'bg-red-50 border-red-200'
+                        }`}
+                      >
+                        <CardHeader className="p-3">
+                          <div className="flex flex-col gap-2">
+                            {/* 첫 번째 줄: 팀명과 점수 (중앙 정렬) */}
+                            <div className="flex items-center justify-center gap-2">
+                              <span className="font-bold text-lg truncate" title={game.teamA?.name || '팀A'}>
+                                {game.teamA?.name || '팀A'}
+                              </span>
+                              <span className="font-bold text-xl text-blue-600">
+                                {game.scoreBoard?.teamATotal || 0}
+                              </span>
+                              <span className="text-gray-400 text-sm">:</span>
+                              <span className="font-bold text-xl text-red-600">
+                                {game.scoreBoard?.teamBTotal || 0}
+                              </span>
+                              <span className="font-bold text-lg truncate" title={game.teamB?.name || '팀B'}>
+                                {game.teamB?.name || '팀B'}
+                              </span>
                             </div>
 
-                            {/* 시간 정보 */}
-                            <div className="flex items-center gap-2 text-xs text-gray-600">
-                              <span>📅 {(game.finishedAt || game.createdAt) && (() => {
-                                try {
-                                  const finishedAt = game.finishedAt || game.createdAt;
-                                  let timestamp;
+                            {/* 두 번째 줄: 날짜/시간 + 체크박스 + 버튼들 (가로 배치) */}
+                            <div className="flex items-center justify-between gap-1">
+                              {/* 왼쪽: 체크박스 + 날짜/시간 정보 */}
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedCompletedGames.includes(game.id)}
+                                  onChange={() => handleToggleCompletedGame(game.id)}
+                                  className="w-4 h-4 cursor-pointer flex-shrink-0"
+                                />
+                                <div className="flex items-center gap-2 text-sm text-gray-700">
+                                  <span className="inline-flex items-center gap-1">
+                                    <span>📅</span>
+                                    <span>{dateTimeStr.split(' ')[0]}</span>
+                                  </span>
+                                  <span className="inline-flex items-center gap-1">
+                                    <span>🕐</span>
+                                    <span>{dateTimeStr.split(' ')[1]}</span>
+                                  </span>
+                                </div>
+                              </div>
 
-                                  if (typeof finishedAt === 'string') {
-                                    timestamp = new Date(finishedAt);
-                                  } else if (finishedAt?.toMillis) {
-                                    timestamp = new Date(finishedAt.toMillis());
-                                  } else if (finishedAt?.seconds) {
-                                    timestamp = new Date(finishedAt.seconds * 1000);
-                                  } else if (typeof finishedAt === 'number') {
-                                    timestamp = new Date(finishedAt);
-                                  } else {
-                                    timestamp = new Date();
-                                  }
-
-                                  const month = timestamp.getMonth() + 1;
-                                  const day = timestamp.getDate();
-                                  const hours = String(timestamp.getHours()).padStart(2, '0');
-                                  const minutes = String(timestamp.getMinutes()).padStart(2, '0');
-
-                                  return `${month}/${day} ${hours}:${minutes}`;
-                                } catch (e) {
-                                  return '-';
-                                }
-                              })()}</span>
-                              <Button
-                                onClick={() => setSelectedGameId(game.id)}
-                                variant="outline"
-                                size="sm"
-                                className="h-6 px-2 text-xs"
-                              >
-                                기록 보기
-                              </Button>
+                              {/* 오른쪽: 버튼들 */}
+                              <div className="flex gap-1.5 items-center">
+                                <Button
+                                  onClick={() => {
+                                    setSelectedRecordGameId(game.id);
+                                    setShowGameRecordModal(true);
+                                  }}
+                                  size="sm"
+                                  className="h-7 px-3 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-200 font-semibold"
+                                >
+                                  기록 보기
+                                </Button>
+                                <Button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteCompletedGame(game);
+                                  }}
+                                  size="sm"
+                                  className="h-7 px-2 text-xs bg-red-100 hover:bg-red-200 text-red-700 border-red-200"
+                                >
+                                  🗑️
+                                </Button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  ))}
+                        </CardHeader>
+                      </Card>
+                    );
+                  })}
                 </div>
               </div>
             ) : (
@@ -791,6 +911,27 @@ const MainApp = () => {
           open={showStudentCodeModal}
           onOpenChange={setShowStudentCodeModal}
         />
+
+        {/* 경기 기록 모달 */}
+        <Dialog open={showGameRecordModal} onOpenChange={setShowGameRecordModal}>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>경기 기록</DialogTitle>
+              <DialogDescription>
+                완료된 경기의 상세 기록을 확인할 수 있습니다.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="mt-4">
+              {selectedRecordGameId && (
+                <StatsView
+                  finishedGames={finishedGames.filter(g => g.id === selectedRecordGameId)}
+                  teams={teams}
+                  defaultTab="games"
+                />
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

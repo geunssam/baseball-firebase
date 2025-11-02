@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useGame } from '../contexts/GameContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Card } from './ui/card';
@@ -72,41 +72,41 @@ const SortablePlayerRow = ({ player, index, isTeamEditMode, positions, onChangeP
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid grid-cols-12 gap-3 items-center p-3 border rounded-lg hover:bg-muted/50 transition-colors group bg-background ${
+      className={`grid grid-cols-[auto_auto_1fr_120px_32px] gap-2 items-center px-1.5 py-1.5 border rounded-lg hover:bg-muted/50 transition-colors group bg-background ${
         isDragging ? 'opacity-50 z-50' : ''
       }`}
     >
       {/* 드래그 핸들 */}
-      <div className="col-span-1 flex items-center justify-center">
+      <div className="flex items-center justify-center w-6">
         <span
           {...attributes}
           {...listeners}
-          className="cursor-move text-muted-foreground hover:text-foreground text-xl"
+          className="cursor-move text-muted-foreground hover:text-foreground text-base"
         >
           ⠿
         </span>
       </div>
 
       {/* 타순 */}
-      <div className="col-span-2 flex items-center justify-center">
-        <div className="inline-flex items-center justify-center bg-slate-100 text-black px-4 py-2 rounded-full font-bold text-xl border-2 border-slate-300">
+      <div className="flex items-center justify-center">
+        <div className="inline-flex items-center justify-center bg-slate-100 text-black px-2 py-1 rounded-full font-bold text-sm border-2 border-slate-300 whitespace-nowrap">
           {player.battingOrder || index + 1}번
         </div>
       </div>
 
       {/* 이름 + 학년-반 배지 */}
-      <div className="col-span-4 flex items-center gap-2">
-        <span className="font-bold text-base">{player.name}</span>
+      <div className="flex items-center gap-1.5">
+        <span className="font-bold text-sm">{player.name}</span>
         {player.className && (
-          <Badge variant="outline" className="text-xs bg-muted">
+          <Badge variant="outline" className="text-[10px] bg-muted px-1 py-0">
             {player.className}
           </Badge>
         )}
-        <span className="text-xs text-muted-foreground">#{player.number || index + 1}</span>
+        <span className="text-[10px] text-muted-foreground">#{player.number || index + 1}</span>
       </div>
 
       {/* 포지션 드롭박스 또는 직접입력 */}
-      <div className="col-span-3">
+      <div className="w-[120px]">
         {isCustomInput ? (
           <div className="flex gap-1">
             <Input
@@ -114,25 +114,25 @@ const SortablePlayerRow = ({ player, index, isTeamEditMode, positions, onChangeP
               value={customPosition}
               onChange={(e) => setCustomPosition(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCustomPositionSubmit()}
-              className="h-9 text-sm flex-1"
+              className="h-7 text-xs flex-1"
               autoFocus
             />
             <Button
               size="sm"
               onClick={handleCustomPositionSubmit}
-              className="h-9 px-2"
+              className="h-7 px-1.5"
             >
               ✓
             </Button>
           </div>
         ) : (
           <Select value={player.position || ''} onValueChange={handlePositionChange}>
-            <SelectTrigger className="h-9 text-sm">
+            <SelectTrigger className="h-7 text-xs">
               <SelectValue placeholder="포지션 선택" />
             </SelectTrigger>
             <SelectContent>
               {positions.map((pos) => (
-                <SelectItem key={pos} value={pos} className="text-sm">
+                <SelectItem key={pos} value={pos} className="text-xs">
                   {pos}
                 </SelectItem>
               ))}
@@ -141,18 +141,15 @@ const SortablePlayerRow = ({ player, index, isTeamEditMode, positions, onChangeP
         )}
       </div>
 
-      {/* 학급 (삭제 예정) */}
-      <div className="col-span-1"></div>
-
-      {/* 삭제 버튼 (편집 모드에서만) */}
-      <div className="col-span-1 flex justify-end">
+      {/* 삭제 버튼 (항상 영역 확보, 편집 모드에서만 표시) */}
+      <div className="flex justify-center w-8">
         {isTeamEditMode && (
           <button
             onClick={() => onRemove(index)}
-            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded transition-colors"
+            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 p-1 rounded transition-colors"
             title="팀에서 제거"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-3 h-3" />
           </button>
         )}
       </div>
@@ -267,6 +264,7 @@ export default function ClassTeamManagementView() {
   // ============================================
   // 상태 관리
   // ============================================
+  const [activeTab, setActiveTab] = useState('class'); // 'class' 또는 'team'
   const [selectedClass, setSelectedClass] = useState(null); // 펼쳐진 학급
   const [selectedStudents, setSelectedStudents] = useState([]); // 선택된 학생들
   const [currentTeamIndex, setCurrentTeamIndex] = useState(0); // 현재 표시 중인 팀 인덱스 (4개씩)
@@ -387,6 +385,29 @@ export default function ClassTeamManagementView() {
   const handleNextTeams = () => {
     if (currentTeamIndex + TEAMS_PER_PAGE < teams.length) {
       setCurrentTeamIndex(currentTeamIndex + TEAMS_PER_PAGE);
+    }
+  };
+
+  // ============================================
+  // 학급 네비게이션
+  // ============================================
+  const CLASSES_PER_PAGE = 4;
+  const [currentClassIndex, setCurrentClassIndex] = useState(0);
+  const totalClassPages = Math.ceil(classNames.length / CLASSES_PER_PAGE);
+  const visibleClasses = classNames.slice(
+    currentClassIndex,
+    currentClassIndex + CLASSES_PER_PAGE
+  );
+
+  const handlePrevClasses = () => {
+    if (currentClassIndex > 0) {
+      setCurrentClassIndex(currentClassIndex - CLASSES_PER_PAGE);
+    }
+  };
+
+  const handleNextClasses = () => {
+    if (currentClassIndex + CLASSES_PER_PAGE < classNames.length) {
+      setCurrentClassIndex(currentClassIndex + CLASSES_PER_PAGE);
     }
   };
 
@@ -992,13 +1013,50 @@ export default function ClassTeamManagementView() {
   };
 
   return (
-    <div className="h-full flex gap-4 p-4">
+    <div className="h-full flex flex-col gap-4 p-4">
       {/* ============================================ */}
-      {/* 좌측: 학급 관리 (30%) */}
+      {/* 탭 헤더 */}
       {/* ============================================ */}
-      <div className="w-[30%] flex flex-col gap-3">
+      <div className="flex gap-2 border-b-2 border-gray-200">
+        <button
+          onClick={() => setActiveTab('class')}
+          className={`px-6 py-3 font-semibold text-sm transition-all ${
+            activeTab === 'class'
+              ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50/50'
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          📚 학급 관리
+        </button>
+        <button
+          onClick={() => setActiveTab('team')}
+          className={`px-6 py-3 font-semibold text-sm transition-all ${
+            activeTab === 'team'
+              ? 'border-b-2 border-purple-500 text-purple-600 bg-purple-50/50'
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          👥 팀 관리
+        </button>
+      </div>
+
+      {/* ============================================ */}
+      {/* 학급 관리 탭 */}
+      {/* ============================================ */}
+      {activeTab === 'class' && (
+        <div className="flex-1 flex flex-col gap-3 bg-blue-50/30 rounded-lg p-3">
         <div className="flex justify-between items-center">
-          <h2 className="text-lg font-bold">학급 관리</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold">학급 관리</h2>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="px-2 py-1 bg-blue-100 rounded-md font-medium text-blue-700">
+                {classNames.length}개 학급
+              </span>
+              <span className="px-2 py-1 bg-green-100 rounded-md font-medium text-green-700">
+                {students.length}명 학생
+              </span>
+            </div>
+          </div>
           <div className="flex gap-2">
             {isClassEditMode ? (
               <>
@@ -1030,119 +1088,188 @@ export default function ClassTeamManagementView() {
           </div>
         </div>
 
-        {/* 학급 목록 (아코디언) */}
-        <div className="flex-1 overflow-y-auto space-y-2">
-          {classNames.map((className) => (
-            <Card key={className} className="relative p-3">
-              {/* 학급 삭제 버튼 (편집 모드일 때만) */}
-              {isClassEditMode && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenDeleteClass(className);
-                  }}
-                  className="absolute -top-2 -right-2 bg-rose-200 text-rose-700 rounded-full p-1 hover:bg-rose-300 transition-colors shadow-md"
-                  title="학급 삭제"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+        {/* 학급 카드 리스트 (상단) */}
+        <div className="relative">
+          {/* 좌측 화살표 (5개 이상일 때만) */}
+          {classNames.length > CLASSES_PER_PAGE && currentClassIndex > 0 && (
+            <button
+              onClick={handlePrevClasses}
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-background border-2 border-border rounded-full p-2 hover:bg-primary/10 hover:border-primary transition-all"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+          )}
 
-              {/* 학급 헤더 */}
-              <div className="flex justify-between items-center">
-                <button
-                  onClick={() => toggleClass(className)}
-                  className="flex-1 text-left font-semibold text-sm flex justify-between items-center hover:text-primary transition-colors"
-                >
-                  <span>{className}</span>
-                  <span className="text-xs text-muted-foreground">
+          {/* 학급 카드 그리드 (최대 4개) */}
+          <div className="grid grid-cols-4 gap-2 px-12">
+            {visibleClasses.map((className) => (
+              <Card
+                key={className}
+                className={`relative py-1.5 px-2 cursor-pointer transition-all hover:shadow-md ${
+                  selectedClass === className ? 'ring-2 ring-primary bg-primary/5' : ''
+                }`}
+                onClick={() => setSelectedClass(selectedClass === className ? null : className)}
+              >
+                {isClassEditMode && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenDeleteClass(className);
+                    }}
+                    className="absolute -top-1.5 -right-1.5 bg-rose-200 text-rose-700 rounded-full p-0.5 hover:bg-rose-300 transition-colors shadow-md"
+                    title="학급 삭제"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <div className="flex items-center justify-center gap-1.5 text-sm">
+                  <span className="font-bold text-foreground">{className}</span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-[11px] text-muted-foreground">
                     {studentsByClass[className].length}명
                   </span>
-                </button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleOpenAddStudents(className)}
-                  className="ml-2 h-7 px-2"
-                >
-                  <Plus className="w-3 h-3" />
-                </Button>
-              </div>
-
-              {/* 학생 목록 (5열 그리드) */}
-              {selectedClass === className && (
-                <div className="mt-3 grid grid-cols-5 gap-2">
-                  {studentsByClass[className].map((student) => (
-                    <div
-                      key={student.id}
-                      className={`
-                        relative p-2 rounded-lg border-2 text-xs font-medium transition-all
-                        ${
-                          selectedStudents.includes(student.id)
-                            ? 'bg-primary/10 border-primary text-primary'
-                            : 'bg-card border-border hover:border-primary/50'
-                        }
-                      `}
-                    >
-                      <button
-                        onClick={() => toggleStudentSelection(student.id)}
-                        className="w-full text-left"
-                      >
-                        {/* 이름 (크고 굵게) */}
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-base">
-                            {student.gender === 'male' ? '👨‍🎓' : student.gender === 'female' ? '👩‍🎓' : '👨‍🎓'}
-                          </span>
-                          <span className="font-bold text-sm">{student.name}</span>
-                        </div>
-                      </button>
-                      {isClassEditMode && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const newGender = student.gender === 'male' ? 'female' : 'male';
-                            updateStudent(student.id, { gender: newGender });
-                          }}
-                          className="mt-1 text-[10px] px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 rounded text-blue-700 transition-colors"
-                          title="성별 변경"
-                        >
-                          {student.gender === 'male' ? '👨→👩' : '👩→👨'}
-                        </button>
-                      )}
-                      {isClassEditMode && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenDeleteStudent(student);
-                          }}
-                          className="absolute -top-1 -right-1 bg-rose-200 text-rose-700 rounded-full p-0.5 hover:bg-rose-300 transition-colors"
-                          title="삭제"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
                 </div>
-              )}
-            </Card>
-          ))}
+              </Card>
+            ))}
 
-          {/* 학급 없을 때 */}
-          {classNames.length === 0 && (
-            <div className="text-center text-muted-foreground text-sm py-8">
-              등록된 학급이 없습니다.
-            </div>
-          )}
+            {/* 학급 없을 때 */}
+            {classNames.length === 0 && (
+              <div className="col-span-4 flex items-center justify-center text-muted-foreground text-sm py-8">
+                등록된 학급이 없습니다.
+              </div>
+            )}
+          </div>
+
+          {/* 우측 화살표 (5개 이상일 때만) */}
+          {classNames.length > CLASSES_PER_PAGE &&
+            currentClassIndex + CLASSES_PER_PAGE < classNames.length && (
+              <button
+                onClick={handleNextClasses}
+                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-background border-2 border-border rounded-full p-2 hover:bg-primary/10 hover:border-primary transition-all"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            )}
         </div>
-      </div>
+
+        {/* 페이지 인디케이터 */}
+        {totalClassPages > 1 && (
+          <div className="flex justify-center gap-1 mt-2">
+            {Array.from({ length: totalClassPages }, (_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentClassIndex(i * CLASSES_PER_PAGE)}
+                className={`w-2 h-2 rounded-full transition-all ${
+                  Math.floor(currentClassIndex / CLASSES_PER_PAGE) === i
+                    ? 'bg-primary w-4'
+                    : 'bg-border hover:bg-primary/50'
+                }`}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* 선택된 학급 학생 목록 (하단) */}
+        {selectedClass ? (
+          <Card className="p-4 max-h-[calc(100vh-16rem)] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-foreground">{selectedClass} 학생 목록</h3>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleOpenAddStudents(selectedClass)}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                학생 추가
+              </Button>
+            </div>
+
+            {/* 학생 목록 (5열 그리드) */}
+            <div className="grid grid-cols-5 gap-2">
+              {(studentsByClass[selectedClass] || []).map((student) => (
+                <div
+                  key={student.id}
+                  className={`
+                    relative py-1.5 px-1 rounded-lg border-2 text-xs font-medium transition-all
+                    ${
+                      selectedStudents.includes(student.id)
+                        ? 'bg-primary/10 border-primary text-primary'
+                        : 'bg-card border-border hover:border-primary/50'
+                    }
+                  `}
+                >
+                  <button
+                    onClick={() => toggleStudentSelection(student.id)}
+                    className="w-full"
+                  >
+                    {/* 이름 (가운데 정렬) */}
+                    <div className="flex items-center justify-center gap-1.5 mb-1">
+                      <span className="text-base">
+                        {student.gender === 'male' ? '👨‍🎓' : student.gender === 'female' ? '👩‍🎓' : '👨‍🎓'}
+                      </span>
+                      <span className="font-bold text-sm">{student.name}</span>
+                    </div>
+                  </button>
+                  {isClassEditMode && (
+                    <div className="flex justify-center">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const newGender = student.gender === 'male' ? 'female' : 'male';
+                          updateStudent(student.id, { gender: newGender });
+                        }}
+                        className="mt-1 text-[10px] px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 rounded text-blue-700 transition-colors"
+                        title="성별 변경"
+                      >
+                        {student.gender === 'male' ? '👨→👩' : '👩→👨'}
+                      </button>
+                    </div>
+                  )}
+                  {isClassEditMode && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenDeleteStudent(student);
+                      }}
+                      className="absolute -top-1 -right-1 bg-rose-200 text-rose-700 rounded-full p-0.5 hover:bg-rose-300 transition-colors"
+                      title="삭제"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+        ) : (
+          <Card className="p-8 text-center text-muted-foreground">
+            <p className="text-4xl mb-3">📚</p>
+            <p>학급을 선택하면 학생 목록이 표시됩니다</p>
+          </Card>
+        )}
+        </div>
+      )}
 
       {/* ============================================ */}
-      {/* 우측: 팀 관리 (70%) */}
+      {/* 팀 관리 탭 */}
       {/* ============================================ */}
-      <div className="w-[70%] flex flex-col gap-3">
+      {activeTab === 'team' && (
+        <div className="flex-1 flex flex-col gap-3 bg-purple-50/20 rounded-lg p-3">
         <div className="flex justify-between items-center">
-          <h2 className="text-lg font-bold">팀 관리</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold">팀 관리</h2>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="px-2 py-1 bg-purple-100 rounded-md font-medium text-purple-700">
+                {teams.length}개 팀
+              </span>
+              <span className="px-2 py-1 bg-blue-100 rounded-md font-medium text-blue-700">
+                {classNames.length}개 학급
+              </span>
+              <span className="px-2 py-1 bg-green-100 rounded-md font-medium text-green-700">
+                {students.length}명 학생
+              </span>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <label className="text-sm text-muted-foreground flex items-center gap-2">
               <input
@@ -1196,11 +1323,11 @@ export default function ClassTeamManagementView() {
           )}
 
           {/* 팀 카드 그리드 (최대 4개) */}
-          <div className="grid grid-cols-4 gap-3 px-8">
+          <div className="grid grid-cols-4 gap-2 px-12">
             {visibleTeams.map((team) => (
               <Card
                 key={team.id}
-                className={`relative p-4 cursor-pointer transition-all hover:shadow-md ${
+                className={`relative py-1.5 px-2 cursor-pointer transition-all hover:shadow-md ${
                   selectedTeam?.id === team.id ? 'ring-2 ring-primary bg-primary/5' : ''
                 }`}
                 onClick={() => setSelectedTeam(team)}
@@ -1211,18 +1338,17 @@ export default function ClassTeamManagementView() {
                       e.stopPropagation();
                       handleDeleteTeam(team);
                     }}
-                    className="absolute -top-2 -right-2 bg-rose-200 text-rose-700 rounded-full p-1 hover:bg-rose-300 transition-colors shadow-md"
+                    className="absolute -top-1.5 -right-1.5 bg-rose-200 text-rose-700 rounded-full p-0.5 hover:bg-rose-300 transition-colors shadow-md"
                     title="팀 삭제"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 )}
-                <h3 className="font-bold text-center text-lg text-foreground">
-                  {team.name}
-                </h3>
-                <p className="text-xs text-muted-foreground text-center mt-1">
-                  선수 {team.players?.length || 0}명
-                </p>
+                <div className="flex items-center justify-center gap-1.5 text-sm">
+                  <span className="font-bold text-foreground">{team.name}</span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-[11px] text-muted-foreground">선수 {team.players?.length || 0}명</span>
+                </div>
               </Card>
             ))}
 
@@ -1265,7 +1391,7 @@ export default function ClassTeamManagementView() {
 
         {/* 선택된 팀 상세 정보 (아래쪽) */}
         {selectedTeam ? (
-          <Card className="p-4 max-h-[calc(100vh-28rem)] overflow-y-auto">
+          <Card className="p-4 max-h-[calc(100vh-16rem)] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-foreground">{selectedTeam.name} 상세</h3>
               <div className="flex gap-2">
@@ -1303,15 +1429,14 @@ export default function ClassTeamManagementView() {
             {selectedTeam.players && selectedTeam.players.length > 0 ? (
               <div className="space-y-2">
                 {/* 테이블 헤더 */}
-                <div className="grid grid-cols-12 gap-3 items-center px-3 py-2 bg-muted/30 rounded-lg text-sm font-semibold text-muted-foreground">
-                  <div className="col-span-1 text-center">
-                    <GripVertical className="w-4 h-4 mx-auto text-muted-foreground" />
+                <div className="grid grid-cols-[auto_auto_1fr_120px_32px] gap-2 items-center px-1.5 py-1.5 bg-muted/30 rounded-lg text-xs font-semibold text-muted-foreground">
+                  <div className="text-center w-6">
+                    <GripVertical className="w-3 h-3 mx-auto text-muted-foreground" />
                   </div>
-                  <div className="col-span-2 text-center">타순</div>
-                  <div className="col-span-4">이름</div>
-                  <div className="col-span-3 text-center">포지션</div>
-                  <div className="col-span-1"></div>
-                  {isTeamEditMode && <div className="col-span-1"></div>}
+                  <div className="text-center">타순</div>
+                  <div>이름</div>
+                  <div className="text-center w-[120px]">포지션</div>
+                  <div className="w-8"></div>
                 </div>
 
                 {/* 드래그 앤 드롭 컨텍스트 */}
@@ -1347,7 +1472,8 @@ export default function ClassTeamManagementView() {
             팀을 선택하면 상세 정보가 표시됩니다.
           </Card>
         )}
-      </div>
+        </div>
+      )}
 
       {/* ============================================ */}
       {/* 새 학급 추가 모달 */}

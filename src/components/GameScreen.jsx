@@ -691,6 +691,11 @@ const GameScreen = ({ gameId, onExit }) => {
         ...game,
         teamA: {
           ...game.teamA,
+          lineup: game.teamA.lineup.map(player => ({
+            ...player,
+            // newBadges 정보 포함하여 경기 기록에 저장
+            newBadges: player.newBadges || []
+          })),
           players: game.teamA.lineup.map(player => ({
             playerId: player.playerId || player.id,
             name: player.name,
@@ -708,6 +713,11 @@ const GameScreen = ({ gameId, onExit }) => {
         },
         teamB: {
           ...game.teamB,
+          lineup: game.teamB.lineup.map(player => ({
+            ...player,
+            // newBadges 정보 포함하여 경기 기록에 저장
+            newBadges: player.newBadges || []
+          })),
           players: game.teamB.lineup.map(player => ({
             playerId: player.playerId || player.id,
             name: player.name,

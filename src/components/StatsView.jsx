@@ -260,38 +260,151 @@ const StatsView = ({ finishedGames, teams, onBack }) => {
                           </div>
                         )}
 
-                        {/* 이닝별 점수 */}
-                        <details className="mt-2">
+                        {/* 경기 세부 내용 */}
+                        <details className="mt-2" open>
                           <summary className="text-xs text-blue-600 cursor-pointer hover:text-blue-800 font-semibold">
-                            📊 이닝별 점수 보기
+                            📊 경기 세부 내용 보기
                           </summary>
-                          <table className="w-full text-center border-collapse text-xs mt-1">
-                            <thead className="bg-gray-100">
-                              <tr>
-                                <th className="border border-gray-300 p-1">팀</th>
-                                {Array.from({ length: game.innings }, (_, i) => (
-                                  <th key={i} className="border border-gray-300 p-1">{i + 1}회</th>
-                                ))}
-                                <th className="border border-gray-300 p-1 bg-yellow-100">총점</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              <tr className={winner === 'A' ? 'bg-blue-50' : ''}>
-                                <td className="border border-gray-300 p-1 font-semibold">{game.teamA?.name}</td>
-                                {game.scoreBoard?.teamA?.map((s, i) => (
-                                  <td key={i} className="border border-gray-300 p-1">{s}</td>
-                                ))}
-                                <td className="border border-gray-300 p-1 font-bold">{scoreA}</td>
-                              </tr>
-                              <tr className={winner === 'B' ? 'bg-red-50' : ''}>
-                                <td className="border border-gray-300 p-1 font-semibold">{game.teamB?.name}</td>
-                                {game.scoreBoard?.teamB?.map((s, i) => (
-                                  <td key={i} className="border border-gray-300 p-1">{s}</td>
-                                ))}
-                                <td className="border border-gray-300 p-1 font-bold">{scoreB}</td>
-                              </tr>
-                            </tbody>
-                          </table>
+
+                          <div className="mt-3 space-y-4">
+                            {/* 이닝별 점수 테이블 */}
+                            <div>
+                              <h4 className="text-sm font-semibold mb-2">이닝별 점수</h4>
+                              <table className="w-full text-center border-collapse text-xs">
+                                <thead className="bg-gray-100">
+                                  <tr>
+                                    <th className="border border-gray-300 p-1">팀</th>
+                                    {Array.from({ length: game.innings }, (_, i) => (
+                                      <th key={i} className="border border-gray-300 p-1">{i + 1}회</th>
+                                    ))}
+                                    <th className="border border-gray-300 p-1 bg-yellow-100">총점</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr className={winner === 'A' ? 'bg-blue-50' : ''}>
+                                    <td className="border border-gray-300 p-1 font-semibold">{game.teamA?.name}</td>
+                                    {game.scoreBoard?.teamA?.map((s, i) => (
+                                      <td key={i} className="border border-gray-300 p-1">{s}</td>
+                                    ))}
+                                    <td className="border border-gray-300 p-1 font-bold">{scoreA}</td>
+                                  </tr>
+                                  <tr className={winner === 'B' ? 'bg-red-50' : ''}>
+                                    <td className="border border-gray-300 p-1 font-semibold">{game.teamB?.name}</td>
+                                    {game.scoreBoard?.teamB?.map((s, i) => (
+                                      <td key={i} className="border border-gray-300 p-1">{s}</td>
+                                    ))}
+                                    <td className="border border-gray-300 p-1 font-bold">{scoreB}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+
+                            {/* 팀A 선수 기록 */}
+                            <div>
+                              <h4 className="text-sm font-semibold mb-2 text-blue-700">
+                                {game.teamA?.name} 팀 선수 기록
+                              </h4>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm border-collapse">
+                                  <thead className="bg-blue-50">
+                                    <tr>
+                                      <th className="border border-gray-300 p-2 text-center">타순</th>
+                                      <th className="border border-gray-300 p-2 text-center">이름</th>
+                                      <th className="border border-gray-300 p-2 text-center">포지션</th>
+                                      <th className="border border-gray-300 p-2 text-center">타석</th>
+                                      <th className="border border-gray-300 p-2 text-center">안타</th>
+                                      <th className="border border-gray-300 p-2 text-center">득점</th>
+                                      <th className="border border-gray-300 p-2 text-center">타점</th>
+                                      <th className="border border-gray-300 p-2 text-center">삼진</th>
+                                      <th className="border border-gray-300 p-2 text-center">아웃</th>
+                                      <th className="border border-gray-300 p-2 text-center">획득 배지</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {game.teamA?.lineup?.sort((a, b) => (a.battingOrder || 999) - (b.battingOrder || 999)).map((player, idx) => (
+                                      <tr key={idx} className="hover:bg-blue-50/50">
+                                        <td className="border border-gray-300 p-2 text-center">{player.battingOrder || '-'}</td>
+                                        <td className="border border-gray-300 p-2 text-center font-medium">{player.name}</td>
+                                        <td className="border border-gray-300 p-2 text-center">{player.position || '-'}</td>
+                                        <td className="border border-gray-300 p-2 text-center">{player.stats?.atBats || 0}</td>
+                                        <td className="border border-gray-300 p-2 text-center font-semibold text-green-600">{player.stats?.hits || 0}</td>
+                                        <td className="border border-gray-300 p-2 text-center font-semibold text-blue-600">{player.stats?.runs || 0}</td>
+                                        <td className="border border-gray-300 p-2 text-center font-semibold text-purple-600">{player.stats?.rbis || 0}</td>
+                                        <td className="border border-gray-300 p-2 text-center text-red-600">{player.stats?.strikeouts || 0}</td>
+                                        <td className="border border-gray-300 p-2 text-center">{player.stats?.outs || 0}</td>
+                                        <td className="border border-gray-300 p-2 text-center">
+                                          {player.newBadges && player.newBadges.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1 justify-center">
+                                              {player.newBadges.map((badge, bidx) => (
+                                                <span key={bidx} className="text-lg" title={badge.name}>
+                                                  {badge.emoji}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span className="text-gray-400">-</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+
+                            {/* 팀B 선수 기록 */}
+                            <div>
+                              <h4 className="text-sm font-semibold mb-2 text-red-700">
+                                {game.teamB?.name} 팀 선수 기록
+                              </h4>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm border-collapse">
+                                  <thead className="bg-red-50">
+                                    <tr>
+                                      <th className="border border-gray-300 p-2 text-center">타순</th>
+                                      <th className="border border-gray-300 p-2 text-center">이름</th>
+                                      <th className="border border-gray-300 p-2 text-center">포지션</th>
+                                      <th className="border border-gray-300 p-2 text-center">타석</th>
+                                      <th className="border border-gray-300 p-2 text-center">안타</th>
+                                      <th className="border border-gray-300 p-2 text-center">득점</th>
+                                      <th className="border border-gray-300 p-2 text-center">타점</th>
+                                      <th className="border border-gray-300 p-2 text-center">삼진</th>
+                                      <th className="border border-gray-300 p-2 text-center">아웃</th>
+                                      <th className="border border-gray-300 p-2 text-center">획득 배지</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {game.teamB?.lineup?.sort((a, b) => (a.battingOrder || 999) - (b.battingOrder || 999)).map((player, idx) => (
+                                      <tr key={idx} className="hover:bg-red-50/50">
+                                        <td className="border border-gray-300 p-2 text-center">{player.battingOrder || '-'}</td>
+                                        <td className="border border-gray-300 p-2 text-center font-medium">{player.name}</td>
+                                        <td className="border border-gray-300 p-2 text-center">{player.position || '-'}</td>
+                                        <td className="border border-gray-300 p-2 text-center">{player.stats?.atBats || 0}</td>
+                                        <td className="border border-gray-300 p-2 text-center font-semibold text-green-600">{player.stats?.hits || 0}</td>
+                                        <td className="border border-gray-300 p-2 text-center font-semibold text-blue-600">{player.stats?.runs || 0}</td>
+                                        <td className="border border-gray-300 p-2 text-center font-semibold text-purple-600">{player.stats?.rbis || 0}</td>
+                                        <td className="border border-gray-300 p-2 text-center text-red-600">{player.stats?.strikeouts || 0}</td>
+                                        <td className="border border-gray-300 p-2 text-center">{player.stats?.outs || 0}</td>
+                                        <td className="border border-gray-300 p-2 text-center">
+                                          {player.newBadges && player.newBadges.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1 justify-center">
+                                              {player.newBadges.map((badge, bidx) => (
+                                                <span key={bidx} className="text-lg" title={badge.name}>
+                                                  {badge.emoji}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span className="text-gray-400">-</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </div>
                         </details>
                       </div>
                     </details>
