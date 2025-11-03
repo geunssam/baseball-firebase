@@ -177,14 +177,14 @@ const BadgeCollection = ({ onBack }) => {
 
     return (
       <Card
-        className={`p-4 bg-card transition-all hover:scale-105 cursor-pointer ${
+        className={`w-full p-3 bg-card transition-all hover:scale-105 cursor-pointer ${
           isAcquired ? 'border-primary/50 hover:border-primary' : 'hover:border-muted-foreground/50'
         }`}
         onClick={handleClick}
       >
-        <div className="flex flex-col items-center text-center gap-2">
+        <div className="flex flex-col items-center text-center gap-1.5">
           {/* 배지 아이콘 - 교사는 항상 컬러로 표시 */}
-          <div className="text-5xl">
+          <div className="text-4xl">
             {badge.icon}
           </div>
 
@@ -207,7 +207,7 @@ const BadgeCollection = ({ onBack }) => {
           </p>
 
           {/* 획득 현황 */}
-          <div className="mt-2 w-full">
+          <div className="mt-1 w-full">
             <div className="flex justify-between text-xs mb-1">
               <span className="text-muted-foreground">획득</span>
               <span className={isAcquired ? 'text-primary font-semibold' : 'text-muted-foreground'}>
@@ -243,43 +243,47 @@ const BadgeCollection = ({ onBack }) => {
   const acquiredBadgeCount = uniqueAcquiredBadges.size;
 
   return (
-    <div className="h-full flex flex-col bg-background">
+    <div className="w-full max-w-full h-full flex flex-col bg-background min-h-0">
       {/* 헤더 */}
-      <div className="border-b bg-card p-4">
-        <div className="flex items-center justify-between mb-4">
+      <div className="border-b bg-card p-3 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          {/* 좌측: 대시보드 버튼 */}
           <button
             onClick={onBack}
-            className="flex items-center gap-2 px-4 py-2 bg-sky-100 hover:bg-sky-200 text-sky-700 font-medium rounded-full transition-all duration-200 shadow-sm hover:shadow-md"
+            className="flex items-center gap-2 px-4 py-2 bg-sky-100 hover:bg-sky-200 text-sky-700 font-medium rounded-full transition-all duration-200 shadow-sm hover:shadow-md flex-shrink-0"
           >
             <span>←</span>
             <span>대시보드</span>
           </button>
-          <h1 className="text-2xl font-bold">🏆 배지 도감 (교사 대시보드)</h1>
-          <div className="w-24"></div>
-        </div>
 
-        {/* 전체 통계 */}
-        <div className="flex items-center justify-center gap-8 bg-muted/50 rounded-lg p-4">
-          <div className="text-center">
-            <p className="text-xs text-muted-foreground mb-1">전체 배지</p>
-            <p className="text-2xl font-bold">{totalBadges}</p>
+          {/* 중앙: 제목 */}
+          <div className="absolute left-1/2 transform -translate-x-1/2">
+            <h1 className="text-2xl font-bold">🏆 배지 도감</h1>
           </div>
-          <div className="text-center">
-            <p className="text-xs text-muted-foreground mb-1">획득한 배지</p>
-            <p className="text-2xl font-bold text-primary">{acquiredBadgeCount}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-xs text-muted-foreground mb-1">달성률</p>
-            <p className="text-2xl font-bold text-primary">
-              {totalBadges > 0 ? Math.round((acquiredBadgeCount / totalBadges) * 100) : 0}%
-            </p>
+
+          {/* 우측: 전체 통계 */}
+          <div className="flex items-center gap-3">
+            <div className="text-center bg-blue-50 rounded-lg px-4 py-2">
+              <p className="text-sm font-bold text-black mb-1">전체 배지</p>
+              <p className="text-2xl font-bold text-black">{totalBadges}</p>
+            </div>
+            <div className="text-center bg-green-50 rounded-lg px-4 py-2">
+              <p className="text-sm font-bold text-black mb-1">획득한 배지</p>
+              <p className="text-2xl font-bold text-black">{acquiredBadgeCount}</p>
+            </div>
+            <div className="text-center bg-purple-50 rounded-lg px-4 py-2">
+              <p className="text-sm font-bold text-black mb-1">달성률</p>
+              <p className="text-2xl font-bold text-black">
+                {totalBadges > 0 ? Math.round((acquiredBadgeCount / totalBadges) * 100) : 0}%
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
       {/* 필터 탭 */}
-      <Tabs value={selectedTier} onValueChange={setSelectedTier} className="flex-1 flex flex-col">
-        <TabsList className="w-full grid grid-cols-6 rounded-none border-b">
+      <Tabs value={selectedTier} onValueChange={setSelectedTier} className="flex-1 w-full max-w-full flex flex-col min-h-0 overflow-hidden">
+        <TabsList className="w-full grid grid-cols-6 rounded-none border-b flex-shrink-0">
           <TabsTrigger value="ALL">전체</TabsTrigger>
           <TabsTrigger value={String(BADGE_TIERS.BEGINNER)}>입문</TabsTrigger>
           <TabsTrigger value={String(BADGE_TIERS.SKILLED)}>숙련</TabsTrigger>
@@ -288,18 +292,58 @@ const BadgeCollection = ({ onBack }) => {
           <TabsTrigger value={String(BADGE_TIERS.SPECIAL)}>특별</TabsTrigger>
         </TabsList>
 
-        <TabsContent value={selectedTier} className="flex-1 overflow-y-auto p-6 mt-0">
-          {filteredBadges.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">해당 등급의 배지가 없습니다.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {filteredBadges.map(badge => (
-                <BadgeCard key={badge.id} badge={badge} />
-              ))}
-            </div>
-          )}
+        {/* 전체 탭 */}
+        <TabsContent value="ALL" className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
+          <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {Object.values(BADGES).map(badge => (
+              <BadgeCard key={badge.id} badge={badge} />
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* 입문 탭 */}
+        <TabsContent value={String(BADGE_TIERS.BEGINNER)} className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
+          <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {Object.values(BADGES).filter(b => b.tier === BADGE_TIERS.BEGINNER).map(badge => (
+              <BadgeCard key={badge.id} badge={badge} />
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* 숙련 탭 */}
+        <TabsContent value={String(BADGE_TIERS.SKILLED)} className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
+          <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {Object.values(BADGES).filter(b => b.tier === BADGE_TIERS.SKILLED).map(badge => (
+              <BadgeCard key={badge.id} badge={badge} />
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* 마스터 탭 */}
+        <TabsContent value={String(BADGE_TIERS.MASTER)} className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
+          <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {Object.values(BADGES).filter(b => b.tier === BADGE_TIERS.MASTER).map(badge => (
+              <BadgeCard key={badge.id} badge={badge} />
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* 레전드 탭 */}
+        <TabsContent value={String(BADGE_TIERS.LEGEND)} className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
+          <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {Object.values(BADGES).filter(b => b.tier === BADGE_TIERS.LEGEND).map(badge => (
+              <BadgeCard key={badge.id} badge={badge} />
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* 특별 탭 */}
+        <TabsContent value={String(BADGE_TIERS.SPECIAL)} className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
+          <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {Object.values(BADGES).filter(b => b.tier === BADGE_TIERS.SPECIAL).map(badge => (
+              <BadgeCard key={badge.id} badge={badge} />
+            ))}
+          </div>
         </TabsContent>
       </Tabs>
 

@@ -297,7 +297,7 @@ const MainApp = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* 상단 네비게이션 바 */}
       <nav className="bg-card shadow-lg border-b border-border">
         <div className="max-w-7xl mx-auto px-4 tablet:px-6 tablet-lg:px-8">
@@ -353,11 +353,11 @@ const MainApp = () => {
               <Button
                 onClick={() => setShowStudentCodeModal(true)}
                 size="sm"
-                className="bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-200 text-xs tablet:text-sm"
+                className="bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-200 text-sm tablet:text-base tablet-lg:text-lg"
               >
                 📋 학생코드
               </Button>
-              <Button onClick={signOut} size="sm" className="bg-red-100 hover:bg-red-200 text-red-700 border-red-200 text-xs tablet:text-sm">
+              <Button onClick={signOut} size="sm" className="bg-red-100 hover:bg-red-200 text-red-700 border-red-200 text-sm tablet:text-base tablet-lg:text-lg">
                 로그아웃
               </Button>
             </div>
@@ -366,7 +366,7 @@ const MainApp = () => {
       </nav>
 
       {/* 메인 콘텐츠 */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className={`w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow flex flex-col ${dashboardView === 'dashboard' ? 'justify-center' : ''}`}>
         {/* 저장 상태 표시 */}
         {saveStatus === 'saving' && (
           <Card className="mb-4 bg-primary/10 border-primary">
@@ -836,7 +836,7 @@ const MainApp = () => {
 
         {/* 배지 도감 뷰 */}
         {dashboardView === 'badges' && (
-          <div className="h-[calc(100vh-8rem)]">
+          <div className="w-full h-[calc(100vh-4rem-3.5rem)]">
             <BadgeCollection
               onBack={() => setDashboardView('dashboard')}
             />
@@ -933,6 +933,17 @@ const MainApp = () => {
           </DialogContent>
         </Dialog>
       </main>
+
+      {/* 하단 푸터 */}
+      <footer className="bg-card shadow-lg border-t border-border sticky bottom-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 tablet:px-6 tablet-lg:px-8">
+          <div className="flex justify-center items-center h-12 tablet:h-14">
+            <p className="text-base tablet:text-lg tablet-lg:text-xl text-muted-foreground font-medium">
+              ✨ Made By <span className="font-bold text-card-foreground">근쌤</span> ✨
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useGame } from '../contexts/GameContext';
+import { useAuth } from '../contexts/AuthContext';
 import firestoreService from '../services/firestoreService';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -8,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from './ui/dropdown-menu';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Settings } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
@@ -18,6 +20,7 @@ import BadgePopup from './BadgePopup';
 import BadgeProgressIndicator from './BadgeProgressIndicator';
 import InningLineupChangeModal from './InningLineupChangeModal';
 import PlayerBadgeOrderModal from './PlayerBadgeOrderModal';
+import StudentCodeListModal from './StudentCodeListModal';
 import { checkNewBadges, calculatePlayerTotalStats, BADGES } from '../utils/badgeSystem';
 import { getNextBadgesProgress } from '../utils/badgeProgress';
 import { debugLog } from '../types/gameTypes';
@@ -124,6 +127,7 @@ const HitBadge = ({ hitType, showDelete = false, onDelete }) => {
  */
 const GameScreen = ({ gameId, onExit }) => {
   const { games, updateGame, students, teams, playerHistory, loadGameHistory } = useGame();
+  const { user, signOut } = useAuth();
   const [game, setGame] = useState(null);
   const [isFieldCollapsed, setIsFieldCollapsed] = useState(false);
   const [isControlCollapsed, setIsControlCollapsed] = useState(false);
@@ -149,6 +153,9 @@ const GameScreen = ({ gameId, onExit }) => {
   const [showRunnersLeftModal, setShowRunnersLeftModal] = useState(false); // 잔루 확인 모달
   const [runnersLeftTeamName, setRunnersLeftTeamName] = useState(''); // 잔루 확인할 팀 이름
   const [runnersLeftData, setRunnersLeftData] = useState(null); // 잔루 데이터
+
+  // 학생 코드 모달
+  const [showStudentCodeModal, setShowStudentCodeModal] = useState(false);
 
   // 안타 상세 기록 접기/펼치기 상태
   const [isAllExpandedTeamA, setIsAllExpandedTeamA] = useState(false); // 팀A 전체 펼치기 여부
@@ -1869,8 +1876,29 @@ const GameScreen = ({ gameId, onExit }) => {
               </div>
             </div>
 
-            {/* 우측: 빈 공간 (대칭을 위해) */}
-            <div className="flex-shrink-0" style={{ width: '100px' }}></div>
+            {/* 우측: 프로필 및 버튼 */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={user?.photoURL} alt={user?.displayName} />
+                <AvatarFallback>{user?.displayName?.charAt(0) || 'U'}</AvatarFallback>
+              </Avatar>
+              <div className="hidden sm:block">
+                <p className="text-sm font-medium text-card-foreground">
+                  {user?.displayName}
+                </p>
+                <p className="text-xs text-muted-foreground">{user?.email}</p>
+              </div>
+              <Button
+                onClick={() => setShowStudentCodeModal(true)}
+                size="sm"
+                className="bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-200 text-sm tablet:text-base tablet-lg:text-lg"
+              >
+                📋 학생코드
+              </Button>
+              <Button onClick={signOut} size="sm" className="bg-red-100 hover:bg-red-200 text-red-700 border-red-200 text-sm tablet:text-base tablet-lg:text-lg">
+                로그아웃
+              </Button>
+            </div>
           </div>
         </div>
       </nav>
@@ -3389,6 +3417,12 @@ const GameScreen = ({ gameId, onExit }) => {
           playerStats={calculateLiveTotalStats(selectedPlayerForBadge) || selectedPlayerForBadge.stats || {}}
         />
       )}
+
+      {/* 학생 코드 모달 */}
+      <StudentCodeListModal
+        isOpen={showStudentCodeModal}
+        onClose={() => setShowStudentCodeModal(false)}
+      />
     </div>
   );
 };
