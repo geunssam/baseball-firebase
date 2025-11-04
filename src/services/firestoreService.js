@@ -1025,6 +1025,48 @@ class FirestoreService {
     }
   }
 
+  /**
+   * 경기 기본 설정 저장
+   * @param {Object} settings - 경기 기본 설정 데이터
+   */
+  async saveGameDefaultSettings(settings) {
+    try {
+      const settingsRef = this.getUserDoc('settings', 'gameDefaults');
+      await setDoc(settingsRef, {
+        ...settings,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+
+      console.log('✅ 경기 기본 설정 저장 완료:', settings);
+    } catch (error) {
+      console.error('❌ 경기 기본 설정 저장 실패:', error);
+      throw new Error('경기 기본 설정 저장에 실패했습니다.');
+    }
+  }
+
+  /**
+   * 경기 기본 설정 가져오기
+   * @returns {Promise<Object|null>} 경기 기본 설정 데이터 또는 null
+   */
+  async getGameDefaultSettings() {
+    try {
+      const settingsRef = this.getUserDoc('settings', 'gameDefaults');
+      const settingsDoc = await getDoc(settingsRef);
+
+      if (!settingsDoc.exists()) {
+        console.log('📭 저장된 경기 기본 설정 없음');
+        return null;
+      }
+
+      const data = settingsDoc.data();
+      console.log('✅ 경기 기본 설정 로드:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ 경기 기본 설정 로드 실패:', error);
+      throw new Error('경기 기본 설정을 불러오는데 실패했습니다.');
+    }
+  }
+
   // ============================================
   // 유틸리티 함수
   // ============================================
@@ -1641,5 +1683,58 @@ export async function getClassRankings(teacherId) {
   } catch (error) {
     console.error('❌ [getClassRankings] 학급별 랭킹 계산 실패:', error);
     throw error;
+  }
+}
+
+/**
+ * 경기 기본 설정 저장
+ * @param {Object} settings - 경기 기본 설정 데이터
+ * @returns {Promise<void>}
+ */
+export async function saveGameDefaultSettings(settings) {
+  try {
+    const userId = auth.currentUser?.uid;
+    if (!userId) {
+      throw new Error('로그인이 필요합니다.');
+    }
+
+    const settingsRef = doc(db, 'users', userId, 'settings', 'gameDefaults');
+    await setDoc(settingsRef, {
+      ...settings,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+
+    console.log('✅ 경기 기본 설정 저장 완료:', settings);
+  } catch (error) {
+    console.error('❌ 경기 기본 설정 저장 실패:', error);
+    throw new Error('경기 기본 설정 저장에 실패했습니다.');
+  }
+}
+
+/**
+ * 경기 기본 설정 가져오기
+ * @returns {Promise<Object|null>} 경기 기본 설정 데이터 또는 null
+ */
+export async function getGameDefaultSettings() {
+  try {
+    const userId = auth.currentUser?.uid;
+    if (!userId) {
+      throw new Error('로그인이 필요합니다.');
+    }
+
+    const settingsRef = doc(db, 'users', userId, 'settings', 'gameDefaults');
+    const settingsDoc = await getDoc(settingsRef);
+
+    if (!settingsDoc.exists()) {
+      console.log('📭 저장된 경기 기본 설정 없음');
+      return null;
+    }
+
+    const data = settingsDoc.data();
+    console.log('✅ 경기 기본 설정 로드:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ 경기 기본 설정 로드 실패:', error);
+    throw new Error('경기 기본 설정을 불러오는데 실패했습니다.');
   }
 }

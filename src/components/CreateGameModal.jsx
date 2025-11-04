@@ -14,8 +14,18 @@ import { useModalKeyboard } from '../hooks/useKeyboardShortcut';
  * - 이닝 수 설정
  * - 이닝별 팀 설정 (공격팀/수비팀)
  * - 카운트 옵션 설정
+ * - 경기 기본 설정 저장 (설정 모드)
  */
-const CreateGameModal = ({ open, onOpenChange, teams, onCreateGame, defaultInnings = 1 }) => {
+const CreateGameModal = ({
+  open,
+  onOpenChange,
+  teams,
+  onCreateGame = null,
+  isSettingsMode = false,
+  onSaveSettings = null,
+  defaultValues = null,
+  defaultInnings = 1
+}) => {
   const [innings, setInnings] = useState(defaultInnings);
   const [inningEndRule, setInningEndRule] = useState('allBatters'); // 'allBatters' | 'nOuts' | 'manual'
   const [outsPerInning, setOutsPerInning] = useState(3);
@@ -33,21 +43,36 @@ const CreateGameModal = ({ open, onOpenChange, teams, onCreateGame, defaultInnin
   const [showTeamSelectModal, setShowTeamSelectModal] = useState(false);
   const [currentInning, setCurrentInning] = useState(null);
 
-  // 모달이 열릴 때마다 초기화
+  // 모달이 열릴 때마다 초기화 (저장된 기본값 또는 디폴트 값)
   useEffect(() => {
     if (open) {
-      setInnings(defaultInnings);
+      // 저장된 기본값이 있으면 적용, 없으면 기본값 사용
+      if (defaultValues) {
+        setInnings(defaultValues.innings || defaultInnings);
+        setInningEndRule(defaultValues.inningEndRule || 'allBatters');
+        setOutsPerInning(defaultValues.outsPerInning || 3);
+        setOptions({
+          strikes: defaultValues.options?.strikes !== undefined ? defaultValues.options.strikes : true,
+          balls: defaultValues.options?.balls !== undefined ? defaultValues.options.balls : false,
+          outs: defaultValues.options?.outs !== undefined ? defaultValues.options.outs : false,
+          bases: defaultValues.options?.bases !== undefined ? defaultValues.options.bases : true,
+        });
+        console.log('📥 저장된 경기 설정 적용:', defaultValues);
+      } else {
+        // 기본값으로 초기화
+        setInnings(defaultInnings);
+        setInningEndRule('allBatters');
+        setOutsPerInning(3);
+        setOptions({
+          strikes: true,
+          balls: false,
+          outs: false,
+          bases: true,
+        });
+      }
       setInningTeams({});
-      setInningEndRule('allBatters');
-      setOutsPerInning(3);
-      setOptions({
-        strikes: true,
-        balls: false,
-        outs: false,
-        bases: true,
-      });
     }
-  }, [open, defaultInnings]);
+  }, [open, defaultInnings, defaultValues]);
 
   // 1회 설정 복사 여부 자동 감지
   const isCopyFirstApplied = () => {
@@ -256,20 +281,56 @@ const CreateGameModal = ({ open, onOpenChange, teams, onCreateGame, defaultInnin
     onOpenChange(false);
   };
 
+  // 설정 저장 핸들러
+  const handleSaveSettings = () => {
+    const settings = {
+      innings,
+      inningEndRule,
+      outsPerInning,
+      options,
+    };
+
+    onSaveSettings(settings);
+    onOpenChange(false);
+  };
+
+  // 설정 초기화 핸들러 (기본값으로 되돌리기)
+  const handleResetSettings = () => {
+    setInnings(defaultInnings);
+    setInningEndRule('allBatters');
+    setOutsPerInning(3);
+    setOptions({
+      strikes: true,
+      balls: false,
+      outs: false,
+      bases: true,
+    });
+    console.log('🔄 경기 설정 초기화 완료');
+  };
+
   // 선택 가능한 팀 (선수가 있는 팀만)
   const availableTeams = teams.filter(t => t.players && t.players.length > 0);
 
-  // 키보드 단축키: ESC로 닫기, Enter로 경기 시작
-  useModalKeyboard(open, () => onOpenChange(false), handleCreate, [inningTeams, innings]);
+  // 키보드 단축키: ESC로 닫기, Enter로 경기 시작 (일반 모드만)
+  useModalKeyboard(
+    open && !isSettingsMode,
+    () => onOpenChange(false),
+    handleCreate,
+    [inningTeams, innings, isSettingsMode]
+  );
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[800px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>🆕 새 경기 만들기</DialogTitle>
+            <DialogTitle>
+              {isSettingsMode ? '⚙️ 경기 기본 설정' : '🆕 새 경기 만들기'}
+            </DialogTitle>
             <DialogDescription>
-              이닝별로 팀을 설정하고 경기 규칙을 선택하세요.
+              {isSettingsMode
+                ? '경기 생성 시 자동으로 적용될 기본값을 설정하세요.'
+                : '이닝별로 팀을 설정하고 경기 규칙을 선택하세요.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -378,127 +439,154 @@ const CreateGameModal = ({ open, onOpenChange, teams, onCreateGame, defaultInnin
               </label>
             </div>
 
-            {/* 3. 이닝별 팀 설정 테이블 */}
-            <div>
-              <Label className="text-base font-semibold">📊 이닝별 팀 설정</Label>
-              <div className="mt-2 border border-gray-200 rounded-lg overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-purple-100">
-                      <th className="p-2 text-left font-semibold text-purple-900">
-                        이닝
-                      </th>
-                      {Array.from({ length: innings }, (_, i) => i + 1).map(inning => (
-                        <th key={inning} className="p-2 text-center font-semibold text-purple-900">
-                          {inning}회
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="p-2 font-medium text-purple-700 bg-purple-50">
-                        공격 vs 수비
-                      </td>
-                      {Array.from({ length: innings }, (_, i) => i + 1).map(inning => {
-                        const offenseConfig = inningTeams[inning]?.offense;
-                        const defenseConfig = inningTeams[inning]?.defense;
-                        const bothSelected = offenseConfig && defenseConfig;
-
-                        return (
-                          <td key={inning} className="p-2 text-center">
-                            {bothSelected ? (
-                              <div className="space-y-2">
-                                {/* 공격팀 */}
-                                <div className="text-xs font-medium text-red-600 bg-red-50 rounded px-2 py-1">
-                                  🔴 {offenseConfig.teamName}
-                                  <span className="text-[10px] text-gray-500 ml-1">
-                                    ({offenseConfig.playerCount}명)
-                                  </span>
-                                </div>
-                                {/* VS */}
-                                <div className="text-[10px] text-gray-400 font-bold">vs</div>
-                                {/* 수비팀 */}
-                                <div className="text-xs font-medium text-blue-600 bg-blue-50 rounded px-2 py-1">
-                                  🔵 {defenseConfig.teamName}
-                                  <span className="text-[10px] text-gray-500 ml-1">
-                                    ({defenseConfig.playerCount}명)
-                                  </span>
-                                </div>
-                                {/* 변경 버튼 */}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 text-[10px] w-full"
-                                  onClick={() => handleOpenTeamSelect(inning)}
-                                >
-                                  변경
-                                </Button>
-                              </div>
-                            ) : (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-28 text-xs w-full border-dashed"
-                                onClick={() => handleOpenTeamSelect(inning)}
-                              >
-                                팀 선택 +
-                              </Button>
-                            )}
+            {/* 3. 이닝별 팀 설정 테이블 (일반 모드에서만 표시) */}
+            {!isSettingsMode && (
+              <>
+                <div>
+                  <Label className="text-base font-semibold">📊 이닝별 팀 설정</Label>
+                  <div className="mt-2 border border-gray-200 rounded-lg overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-purple-100">
+                          <th className="p-2 text-left font-semibold text-purple-900">
+                            이닝
+                          </th>
+                          {Array.from({ length: innings }, (_, i) => i + 1).map(inning => (
+                            <th key={inning} className="p-2 text-center font-semibold text-purple-900">
+                              {inning}회
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="p-2 font-medium text-purple-700 bg-purple-50">
+                            공격 vs 수비
                           </td>
-                        );
-                      })}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                          {Array.from({ length: innings }, (_, i) => i + 1).map(inning => {
+                            const offenseConfig = inningTeams[inning]?.offense;
+                            const defenseConfig = inningTeams[inning]?.defense;
+                            const bothSelected = offenseConfig && defenseConfig;
 
-            {/* 4. 빠른 설정 버튼 (가로 반반) */}
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                variant="outline"
-                onClick={handleCopyFirstInning}
-                className={`text-sm transition-all duration-300 ${
-                  isCopyFirstApplied()
-                    ? 'bg-green-100 border-green-400 text-green-700 font-semibold'
-                    : ''
-                }`}
-              >
-                {isCopyFirstApplied() ? '✅ 복사됨' : '🔄 1회 설정 복사'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleAutoAlternate}
-                className={`text-sm transition-all duration-300 ${
-                  isAutoAlternateApplied()
-                    ? 'bg-blue-100 border-blue-400 text-blue-700 font-semibold'
-                    : ''
-                }`}
-              >
-                {isAutoAlternateApplied() ? '✅ 교대됨' : '⚡ 공수 교대 자동'}
-              </Button>
-            </div>
+                            return (
+                              <td key={inning} className="p-2 text-center">
+                                {bothSelected ? (
+                                  <div className="space-y-2">
+                                    {/* 공격팀 */}
+                                    <div className="text-xs font-medium text-red-600 bg-red-50 rounded px-2 py-1">
+                                      🔴 {offenseConfig.teamName}
+                                      <span className="text-[10px] text-gray-500 ml-1">
+                                        ({offenseConfig.playerCount}명)
+                                      </span>
+                                    </div>
+                                    {/* VS */}
+                                    <div className="text-[10px] text-gray-400 font-bold">vs</div>
+                                    {/* 수비팀 */}
+                                    <div className="text-xs font-medium text-blue-600 bg-blue-50 rounded px-2 py-1">
+                                      🔵 {defenseConfig.teamName}
+                                      <span className="text-[10px] text-gray-500 ml-1">
+                                        ({defenseConfig.playerCount}명)
+                                      </span>
+                                    </div>
+                                    {/* 변경 버튼 */}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 text-[10px] w-full"
+                                      onClick={() => handleOpenTeamSelect(inning)}
+                                    >
+                                      변경
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-28 text-xs w-full border-dashed"
+                                    onClick={() => handleOpenTeamSelect(inning)}
+                                  >
+                                    팀 선택 +
+                                  </Button>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
-            {availableTeams.length === 0 && (
-              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
-                <p className="text-sm text-destructive font-medium">
-                  ⚠️ 선수가 있는 팀이 없습니다
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  먼저 팀을 만들고 선수를 추가해주세요.
-                </p>
-              </div>
+                {/* 4. 빠른 설정 버튼 (가로 반반) */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={handleCopyFirstInning}
+                    className={`text-sm transition-all duration-300 ${
+                      isCopyFirstApplied()
+                        ? 'bg-green-100 border-green-400 text-green-700 font-semibold'
+                        : ''
+                    }`}
+                  >
+                    {isCopyFirstApplied() ? '✅ 복사됨' : '🔄 1회 설정 복사'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleAutoAlternate}
+                    className={`text-sm transition-all duration-300 ${
+                      isAutoAlternateApplied()
+                        ? 'bg-blue-100 border-blue-400 text-blue-700 font-semibold'
+                        : ''
+                    }`}
+                  >
+                    {isAutoAlternateApplied() ? '✅ 교대됨' : '⚡ 공수 교대 자동'}
+                  </Button>
+                </div>
+
+                {availableTeams.length === 0 && (
+                  <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+                    <p className="text-sm text-destructive font-medium">
+                      ⚠️ 선수가 있는 팀이 없습니다
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      먼저 팀을 만들고 선수를 추가해주세요.
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </div>
+
+          {/* 설정 모드 안내 메시지 */}
+          {isSettingsMode && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+              <p className="text-sm text-blue-800 font-medium flex items-center gap-2">
+                ℹ️ 새 경기를 만들 때 이 설정이 자동으로 적용됩니다
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                저장 후 새 경기 생성 시 이닝 수와 규칙이 자동으로 설정되어 팀 선택만 하면 바로 시작할 수 있습니다.
+              </p>
+            </div>
+          )}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               취소 <kbd className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 rounded border">ESC</kbd>
             </Button>
-            <Button onClick={handleCreate} disabled={availableTeams.length < 1}>
-              경기 시작 → <kbd className="ml-2 px-1.5 py-0.5 text-xs bg-blue-100 rounded border">Enter</kbd>
-            </Button>
+            {isSettingsMode ? (
+              <>
+                <Button variant="outline" onClick={handleResetSettings} className="text-orange-600 hover:text-orange-700 hover:bg-orange-50">
+                  🔄 초기화
+                </Button>
+                <Button onClick={handleSaveSettings} className="bg-green-600 hover:bg-green-700">
+                  💾 기본 설정 저장
+                </Button>
+              </>
+            ) : (
+              <Button onClick={handleCreate} disabled={availableTeams.length < 1}>
+                경기 시작 → <kbd className="ml-2 px-1.5 py-0.5 text-xs bg-blue-100 rounded border">Enter</kbd>
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

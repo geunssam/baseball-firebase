@@ -22,7 +22,7 @@ import ClassRankingWidget from './ClassRankingWidget';
 import ClassDetailRankingModal from './ClassDetailRankingModal';
 import { useModalKeyboard } from '../hooks/useKeyboardShortcut';
 import { BADGES } from '../utils/badgeSystem';
-import { saveCustomBadge, loadCustomBadges, deleteCustomBadge, awardManualBadge, recalculateAllStudentBadges } from '../services/firestoreService';
+import { saveCustomBadge, loadCustomBadges, deleteCustomBadge, awardManualBadge, recalculateAllStudentBadges, saveGameDefaultSettings, getGameDefaultSettings } from '../services/firestoreService';
 
 const MainApp = () => {
   const { user, signOut } = useAuth();
@@ -71,6 +71,10 @@ const MainApp = () => {
   // 학급 랭킹 관련 상태
   const [showClassDetailModal, setShowClassDetailModal] = useState(false);
   const [selectedClassData, setSelectedClassData] = useState(null);
+
+  // 경기 설정 관련 상태
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [gameDefaultSettings, setGameDefaultSettings] = useState(null);
 
   // 현재 날짜/시간 업데이트
   useEffect(() => {
@@ -140,6 +144,21 @@ const MainApp = () => {
     }
   }, [user]);
 
+  // 경기 기본 설정 불러오기
+  useEffect(() => {
+    const loadGameDefaults = async () => {
+      if (user) {
+        try {
+          const settings = await getGameDefaultSettings();
+          setGameDefaultSettings(settings);
+        } catch (error) {
+          console.error('경기 기본 설정 로드 실패:', error);
+        }
+      }
+    };
+    loadGameDefaults();
+  }, [user]);
+
   // 경기 목록 필터링
   const playingGames = games.filter(g => g.status === 'playing');
   const completedGames = finishedGames.slice(0, 5); // 최근 5개만
@@ -162,6 +181,19 @@ const MainApp = () => {
       setShowCreateModal(false);
     } catch (error) {
       alert('❌ 팀 생성에 실패했습니다: ' + error.message);
+    }
+  };
+
+  // 경기 기본 설정 저장 핸들러
+  const handleSaveGameSettings = async (settings) => {
+    try {
+      await saveGameDefaultSettings(settings);
+      setGameDefaultSettings(settings);
+      alert('⚙️ 경기 기본 설정이 저장되었습니다!');
+      console.log('✅ 경기 기본 설정 저장 완료:', settings);
+    } catch (error) {
+      console.error('경기 기본 설정 저장 실패:', error);
+      alert('❌ 경기 기본 설정 저장에 실패했습니다.');
     }
   };
 
@@ -542,6 +574,13 @@ const MainApp = () => {
                 className="bg-yellow-100 hover:bg-yellow-200 text-yellow-700 border-yellow-200 text-sm tablet:text-base tablet-lg:text-lg"
               >
                 🏆 학급 랭킹
+              </Button>
+              <Button
+                onClick={() => setShowSettingsModal(true)}
+                size="sm"
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-200 text-sm tablet:text-base tablet-lg:text-lg"
+              >
+                ⚙️ 설정
               </Button>
               <Button onClick={signOut} size="sm" className="bg-red-100 hover:bg-red-200 text-red-700 border-red-200 text-sm tablet:text-base tablet-lg:text-lg">
                 로그아웃
@@ -1118,6 +1157,18 @@ const MainApp = () => {
           onOpenChange={setShowCreateGameModal}
           teams={teams}
           onCreateGame={handleCreateGame}
+          isSettingsMode={false}
+          defaultValues={gameDefaultSettings}
+        />
+
+        {/* 경기 설정 모달 */}
+        <CreateGameModal
+          open={showSettingsModal}
+          onOpenChange={setShowSettingsModal}
+          teams={teams}
+          isSettingsMode={true}
+          onSaveSettings={handleSaveGameSettings}
+          defaultValues={gameDefaultSettings}
         />
 
         {/* 학생 코드 목록 모달 */}
