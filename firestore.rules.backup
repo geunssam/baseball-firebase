@@ -30,7 +30,10 @@ service cloud.firestore {
     match /{path=**}/finishedGames/{gameId} {
       allow read: if true;  // 학생이 경기 기록을 볼 수 있도록
     }
-
+    match /{path=**}/games/{gameId} {
+      allow read: if true;  // 학생이 진행 중인 경기를 볼 수 있도록
+    }
+    
     match /{path=**}/playerBadges/{playerId} {
       allow read: if true;  // 학생이 배지를 볼 수 있도록
     }
@@ -84,6 +87,12 @@ service cloud.firestore {
       match /settings/{document=**} {
         allow read, write: if isOwner(userId);
       }
+
+      // 커스텀 배지 (Phase 1)
+      match /customBadges/{badgeId} {
+        allow read: if isSignedIn();  // 모든 로그인 유저가 볼 수 있음
+        allow write: if isOwner(userId);  // 본인만 수정
+      }
     }
 
     // ============================================
@@ -106,6 +115,21 @@ service cloud.firestore {
       allow delete: if isSignedIn() &&
                        (resource.data.requesterId == request.auth.uid ||
                         resource.data.ownerId == request.auth.uid);
+    }
+
+    // ============================================
+    // 개인정보 처리 동의 (privacy_consents 컬렉션)
+    // ============================================
+
+    match /privacy_consents/{consentId} {
+      // 읽기: 본인의 동의 기록만
+      allow read: if isSignedIn() &&
+                     resource.data.teacherId == request.auth.uid;
+
+      // 쓰기: 본인의 동의 기록만 생성/수정 가능
+      allow write: if isSignedIn() &&
+                      request.resource.data.teacherId == request.auth.uid &&
+                      request.resource.data.consentType == 'teacher';
     }
   }
 }

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Check } from 'lucide-react';
+import { isSharedItem, getPermissionBadgeInfo } from '../utils/permissionHelpers.jsx';
 
 /**
  * 한글 초성 추출 함수
@@ -110,6 +111,8 @@ const TeamSelectModal = ({
   // 팀 카드 렌더링 함수
   const renderTeamCard = (team, selectedId, onSelectTeam, side) => {
     const isSelected = selectedId === team.id;
+    const shared = isSharedItem(team);
+    const badgeInfo = shared ? getPermissionBadgeInfo(team.permission) : null;
 
     return (
       <div
@@ -125,9 +128,19 @@ const TeamSelectModal = ({
       >
         <div className="flex items-center justify-center gap-1 text-xs">
           <span className="font-semibold truncate">{team.name}</span>
+          {shared && (
+            <span className={`text-[9px] px-1 py-0.5 rounded-full ${badgeInfo.color}`}>
+              {badgeInfo.icon}
+            </span>
+          )}
           {isSelected && <Check className="w-3 h-3 text-primary flex-shrink-0" />}
           <span className="text-[10px] text-muted-foreground whitespace-nowrap">👥{team.players.length}</span>
         </div>
+        {shared && (
+          <div className="text-[9px] text-gray-500 text-center mt-0.5 truncate">
+            {team.ownerName || '공유됨'}
+          </div>
+        )}
       </div>
     );
   };

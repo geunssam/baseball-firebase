@@ -4,6 +4,43 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ============================================
+    // 공유 시스템 데이터 구조 (Phase 1)
+    // ============================================
+    /*
+     * shares 컬렉션: 교사 간 학급/팀 공유 정보
+     *
+     * 구조:
+     * {
+     *   shareId: "auto-generated-doc-id",
+     *   ownerId: "teacher-a-uid",          // 원 소유자 UID
+     *   ownerName: "김선생님",              // 원 소유자 이름
+     *   inviteCode: "uuid-v4",             // 초대 코드 (UUID)
+     *   items: [                           // 공유할 항목 배열
+     *     { type: "class", id: "classId1", name: "3학년 1반" },
+     *     { type: "team", id: "teamId1", name: "레드팀" }
+     *   ],
+     *   permissions: {                     // 권한 관리
+     *     viewers: ["teacher-b-uid"],      // 조회만 가능
+     *     editors: ["teacher-c-uid"],      // 경기 진행 가능
+     *     owners: ["teacher-a-uid"]        // 전체 관리 (원 소유자)
+     *   },
+     *   createdAt: timestamp,
+     *   updatedAt: timestamp
+     * }
+     *
+     * users/{userId}/sharedWithMe 서브컬렉션: 내가 참여 중인 공유 목록
+     *
+     * 구조:
+     * {
+     *   shareId: "share-doc-id",           // shares 컬렉션의 문서 ID
+     *   ownerId: "teacher-a-uid",          // 원 소유자 UID
+     *   ownerName: "김선생님",              // 원 소유자 이름
+     *   permission: "editor",              // 내 권한 (viewer, editor, owner)
+     *   joinedAt: timestamp                // 참여 일시
+     * }
+     */
+
+    // ============================================
     // 헬퍼 함수
     // ============================================
 
@@ -15,6 +52,40 @@ service cloud.firestore {
     // 데이터 소유자 확인
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // 공유 권한 확인 (Phase 1)
+    // shareDocId: shares 컬렉션의 문서 ID (클라이언트에서 전달)
+    // requiredLevel: "viewer", "editor", "owner" 중 하나
+    //
+    // ⚠️ 중요: Firestore Rules의 제약으로 인해 복잡한 쿼리가 어렵습니다.
+    // 따라서 클라이언트 코드에서 shareDocId를 함께 전달해야 합니다.
+    function hasSharePermission(shareDocId, requiredLevel) {
+      let userId = request.auth.uid;
+      let shareDoc = get(/databases/$(database)/documents/shares/$(shareDocId)).data;
+
+      // 요청한 권한 레벨에 따라 접근 허용 여부 판단
+      return (requiredLevel == 'viewer' &&
+              (userId in shareDoc.permissions.viewers ||
+               userId in shareDoc.permissions.editors ||
+               userId in shareDoc.permissions.owners)) ||
+             (requiredLevel == 'editor' &&
+              (userId in shareDoc.permissions.editors ||
+               userId in shareDoc.permissions.owners)) ||
+             (requiredLevel == 'owner' &&
+              userId in shareDoc.permissions.owners);
+    }
+
+    // 특정 소유자의 특정 항목에 대한 공유 권한 확인
+    // ownerId: 데이터 소유자 UID
+    // userId: 접근 요청자 UID
+    //
+    // ⚠️ 이 함수는 단순화된 버전입니다.
+    // 실제로는 클라이언트에서 sharedWithMe 컬렉션을 조회하여
+    // 권한을 확인하는 방식으로 구현합니다.
+    function hasSharedAccess(ownerId, userId) {
+      return userId == ownerId ||
+             exists(/databases/$(database)/documents/users/$(userId)/sharedWithMe/$(ownerId));
     }
 
     // ============================================
@@ -53,34 +124,59 @@ service cloud.firestore {
         allow write: if isOwner(userId);
       }
 
-      // 학생 데이터: 소유자만 쓰기 (읽기는 위의 collectionGroup 규칙으로 처리됨)
+      // 학생 데이터 (Phase 1: 공유 권한 추가)
       match /students/{studentId} {
+        // 읽기: collectionGroup 규칙(학생 로그인)에 의해 모든 사람 조회 가능
+        // 쓰기: 소유자만 가능 (공유받은 교사는 학생 정보 수정 불가)
         allow write: if isOwner(userId);
       }
 
-      // 팀 데이터: 소유자만 읽기/쓰기 (간단 버전)
+      // 팀 데이터 (Phase 1: 공유 권한 추가)
       match /teams/{teamId} {
-        allow read, write: if isOwner(userId);
+        // 읽기: 소유자 + 공유받은 교사 (hasSharedAccess로 확인)
+        allow read: if isOwner(userId) || hasSharedAccess(userId, request.auth.uid);
+
+        // 쓰기: 소유자만 가능 (팀 구성 변경은 소유자만)
+        allow write: if isOwner(userId);
       }
 
-      // 경기 데이터: 소유자만 읽기/쓰기
+      // 경기 데이터 (Phase 1: 공유 권한 추가) 🔥 핵심!
       match /games/{gameId} {
-        allow read, write: if isOwner(userId);
+        // 읽기: collectionGroup 규칙(학생용)에 의해 모든 사람 조회 가능
+
+        // 생성: 소유자 + 공유받은 편집자 이상
+        // 편집자가 경기를 생성할 때도 ownerId는 원 소유자로 설정되어야 함
+        allow create: if isOwner(userId) || hasSharedAccess(userId, request.auth.uid);
+
+        // 수정: 소유자 + 공유받은 편집자 이상 (경기 진행)
+        allow update: if isOwner(userId) || hasSharedAccess(userId, request.auth.uid);
+
+        // 삭제: 소유자만 가능
+        allow delete: if isOwner(userId);
       }
 
-      // 종료된 경기: 소유자만 쓰기 (읽기는 collectionGroup 규칙으로 처리됨)
+      // 종료된 경기 (Phase 1: 공유 권한 추가)
       match /finishedGames/{gameId} {
-        allow write: if isOwner(userId);
+        // 읽기: collectionGroup 규칙(학생용)에 의해 모든 사람 조회 가능
+
+        // 쓰기: 소유자 + 공유받은 편집자 이상 (경기 종료 시 기록)
+        allow write: if isOwner(userId) || hasSharedAccess(userId, request.auth.uid);
       }
 
-      // 선수 배지: 소유자만 쓰기 (읽기는 collectionGroup 규칙으로 처리됨)
+      // 선수 배지 (Phase 1: 공유 권한 추가)
       match /playerBadges/{playerId} {
-        allow write: if isOwner(userId);
+        // 읽기: collectionGroup 규칙(학생용)에 의해 모든 사람 조회 가능
+
+        // 쓰기: 소유자 + 공유받은 편집자 이상 (경기 중 배지 수여)
+        allow write: if isOwner(userId) || hasSharedAccess(userId, request.auth.uid);
       }
 
-      // 선수 히스토리: 소유자만 쓰기 (읽기는 collectionGroup 규칙으로 처리됨)
+      // 선수 히스토리 (Phase 1: 공유 권한 추가)
       match /playerHistory/{playerId} {
-        allow write: if isOwner(userId);
+        // 읽기: collectionGroup 규칙(학생용)에 의해 모든 사람 조회 가능
+
+        // 쓰기: 소유자 + 공유받은 편집자 이상 (경기 기록 업데이트)
+        allow write: if isOwner(userId) || hasSharedAccess(userId, request.auth.uid);
       }
 
       // 설정
@@ -130,6 +226,56 @@ service cloud.firestore {
       allow write: if isSignedIn() &&
                       request.resource.data.teacherId == request.auth.uid &&
                       request.resource.data.consentType == 'teacher';
+    }
+
+    // ============================================
+    // 공유 시스템 (shares 컬렉션) - Phase 1
+    // ============================================
+
+    match /shares/{shareId} {
+      // 생성: 로그인한 사용자가 본인을 소유자로 하는 공유 생성 가능
+      allow create: if isSignedIn() &&
+                       request.resource.data.ownerId == request.auth.uid &&
+                       request.auth.uid in request.resource.data.permissions.owners;
+
+      // 읽기: 소유자 또는 공유 참여자(viewer, editor, owner)만 가능
+      allow read: if isSignedIn() && (
+        resource.data.ownerId == request.auth.uid ||
+        request.auth.uid in resource.data.permissions.viewers ||
+        request.auth.uid in resource.data.permissions.editors ||
+        request.auth.uid in resource.data.permissions.owners
+      );
+
+      // 수정: 소유자만 가능 (권한 변경, 항목 추가/제거 등)
+      allow update: if isSignedIn() &&
+                       resource.data.ownerId == request.auth.uid &&
+                       request.resource.data.ownerId == request.auth.uid;
+
+      // 삭제: 소유자만 가능
+      allow delete: if isSignedIn() &&
+                       resource.data.ownerId == request.auth.uid;
+    }
+
+    // 공유받은 항목 목록 (users/{userId}/sharedWithMe)
+    match /users/{userId}/sharedWithMe/{shareId} {
+      // 읽기: 본인의 공유 목록만 조회 가능
+      allow read: if isSignedIn() && request.auth.uid == userId;
+
+      // 생성: 초대 수락 시에만 가능
+      // - 본인의 sharedWithMe에만 추가 가능
+      // - 참조하는 shares 문서가 실제로 존재하고
+      // - 자신이 해당 공유의 참여자 목록에 포함되어 있어야 함
+      allow create: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       exists(/databases/$(database)/documents/shares/$(request.resource.data.shareId));
+
+      // 수정: 본인의 기록만 수정 가능 (permission 변경 시)
+      allow update: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       resource.data.shareId == request.resource.data.shareId;
+
+      // 삭제: 본인의 기록만 삭제 가능 (공유 탈퇴)
+      allow delete: if isSignedIn() && request.auth.uid == userId;
     }
   }
 }

@@ -187,22 +187,64 @@ class FirestoreService {
    */
   subscribeToTeams(callback) {
     try {
+      const userId = this.getCurrentUserId();
       const teamsRef = this.getUserCollection('teams');
-      console.log('📡 [FirestoreService] subscribeToTeams 시작, userId:', this.getCurrentUserId());
+      console.log('📡 [FirestoreService] subscribeToTeams 시작, userId:', userId);
 
       // 생성 시간 순서대로 정렬하여 팀 목록 가져오기
       const q = query(teamsRef, orderBy('createdAt', 'asc'));
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        console.log('📡 [FirestoreService] onSnapshot 콜백 호출됨, snapshot.size:', snapshot.size);
-        const teams = [];
+      // 1. 내 팀 리스너
+      const unsubscribeMyTeams = onSnapshot(q, async (snapshot) => {
+        console.log('📡 [FirestoreService] 내 팀 onSnapshot 콜백, snapshot.size:', snapshot.size);
+        const myTeams = [];
         snapshot.forEach((doc) => {
-          console.log('📡 [FirestoreService] 팀 문서:', doc.id, doc.data());
-          teams.push({ id: doc.id, ...doc.data() });
+          console.log('📡 [FirestoreService] 내 팀 문서:', doc.id, doc.data());
+          myTeams.push({
+            id: doc.id,
+            ...doc.data(),
+            isShared: false, // 내 팀은 공유된 것이 아님
+            ownerId: userId
+          });
         });
 
-        console.log(`🔄 팀 동기화: ${teams.length}개 (생성 시간순 정렬)`);
-        callback(teams);
+        // 2. 공유받은 팀 가져오기
+        try {
+          const sharedItems = await getSharedWithMe();
+          const sharedTeams = [];
+
+          // sharedItems에서 type='team'인 항목들을 찾아서 실제 팀 데이터 조회
+          for (const sharedItem of sharedItems) {
+            if (!sharedItem.items) continue;
+
+            for (const item of sharedItem.items) {
+              if (item.type !== 'team') continue;
+
+              // 소유자의 팀 데이터 가져오기
+              const sharedTeam = await getSharedTeam(sharedItem.ownerId, item.id);
+
+              if (sharedTeam) {
+                sharedTeams.push({
+                  ...sharedTeam,
+                  isShared: true,
+                  shareId: sharedItem.shareId,
+                  ownerId: sharedItem.ownerId,
+                  ownerName: sharedItem.ownerName,
+                  permission: sharedItem.permission
+                });
+              }
+            }
+          }
+
+          console.log(`🔄 팀 동기화: 내 팀 ${myTeams.length}개 + 공유받은 팀 ${sharedTeams.length}개`);
+
+          // 내 팀 + 공유받은 팀 합쳐서 콜백 호출
+          callback([...myTeams, ...sharedTeams]);
+        } catch (error) {
+          console.error('❌ 공유받은 팀 로드 실패:', error);
+          // 공유 팀 로드 실패해도 내 팀은 보여주기
+          callback(myTeams);
+        }
       }, (error) => {
         console.error('❌ 팀 리스너 오류:', error);
         console.error('❌ 에러 코드:', error.code);
@@ -210,8 +252,8 @@ class FirestoreService {
         callback([]);
       });
 
-      this.unsubscribers.push(unsubscribe);
-      return unsubscribe;
+      this.unsubscribers.push(unsubscribeMyTeams);
+      return unsubscribeMyTeams;
     } catch (error) {
       console.error('❌ 팀 리스너 생성 실패:', error);
       throw new Error('실시간 동기화 설정에 실패했습니다.');
@@ -1736,5 +1778,360 @@ export async function getGameDefaultSettings() {
   } catch (error) {
     console.error('❌ 경기 기본 설정 로드 실패:', error);
     throw new Error('경기 기본 설정을 불러오는데 실패했습니다.');
+  }
+}
+
+// ============================================
+// 공유 시스템 (Phase 3)
+// ============================================
+
+/**
+ * 공유 링크 생성
+ * @param {Array} items - [{type: 'class'|'team', id: string, name: string, count: number}]
+ * @param {string} permission - 'viewer' | 'editor'
+ * @returns {Promise<Object>} { shareId, inviteCode, shareUrl }
+ */
+export async function createShareLink(items, permission = 'viewer') {
+  try {
+    const userId = auth.currentUser?.uid;
+    if (!userId) {
+      throw new Error('로그인이 필요합니다.');
+    }
+
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    const userName = userDoc.data()?.displayName || userDoc.data()?.email || '익명';
+
+    // UUID 기반 고유 토큰 생성
+    const { v4: uuidv4 } = await import('uuid');
+    const inviteCode = uuidv4();
+
+    // shares 컬렉션에 저장
+    const shareRef = doc(db, 'shares', inviteCode);
+    await setDoc(shareRef, {
+      ownerId: userId,
+      ownerName: userName,
+      items: items.map(item => ({
+        type: item.type,
+        id: item.id,
+        name: item.name,
+        count: item.count
+      })),
+      inviteCode,
+      permissions: {
+        viewers: permission === 'viewer' ? [] : [],
+        editors: permission === 'editor' ? [] : [],
+        owners: [userId]
+      },
+      defaultPermission: permission, // 신규 참여자 기본 권한
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+
+    // 초대 링크 생성
+    const shareUrl = `${window.location.origin}/share/${inviteCode}`;
+    console.log('✅ 공유 링크 생성:', shareUrl);
+
+    return {
+      shareId: inviteCode,
+      inviteCode,
+      shareUrl
+    };
+  } catch (error) {
+    console.error('❌ 공유 링크 생성 실패:', error);
+    throw new Error('공유 링크 생성에 실패했습니다.');
+  }
+}
+
+/**
+ * 공유 정보 조회
+ * @param {string} inviteCode - 초대 코드
+ * @returns {Promise<Object>} 공유 정보
+ */
+export async function getShareData(inviteCode) {
+  try {
+    const shareRef = doc(db, 'shares', inviteCode);
+    const shareDoc = await getDoc(shareRef);
+
+    if (!shareDoc.exists()) {
+      throw new Error('유효하지 않은 초대 링크입니다.');
+    }
+
+    const shareData = shareDoc.data();
+    const defaultPermission = shareData.defaultPermission || 'viewer';
+
+    console.log('✅ 공유 정보 로드:', shareData);
+
+    return {
+      shareId: inviteCode,
+      ownerId: shareData.ownerId,
+      ownerName: shareData.ownerName,
+      items: shareData.items,
+      permission: defaultPermission,
+      createdAt: shareData.createdAt
+    };
+  } catch (error) {
+    console.error('❌ 공유 정보 로드 실패:', error);
+    throw error;
+  }
+}
+
+/**
+ * 초대 수락 (공유 참여)
+ * @param {string} inviteCode - 초대 코드
+ * @returns {Promise<void>}
+ */
+export async function joinByInvite(inviteCode) {
+  try {
+    const userId = auth.currentUser?.uid;
+    if (!userId) {
+      throw new Error('로그인이 필요합니다.');
+    }
+
+    const shareData = await getShareData(inviteCode);
+
+    // 자기 자신의 공유는 수락 불가
+    if (shareData.ownerId === userId) {
+      throw new Error('본인이 생성한 공유는 수락할 수 없습니다.');
+    }
+
+    // 1. shares 문서의 permissions에 사용자 추가
+    const shareRef = doc(db, 'shares', inviteCode);
+    const shareDoc = await getDoc(shareRef);
+    const permissions = shareDoc.data().permissions;
+
+    // 권한별로 사용자 추가
+    if (shareData.permission === 'viewer') {
+      if (!permissions.viewers.includes(userId)) {
+        permissions.viewers.push(userId);
+      }
+    } else if (shareData.permission === 'editor') {
+      if (!permissions.editors.includes(userId)) {
+        permissions.editors.push(userId);
+      }
+    }
+
+    await updateDoc(shareRef, {
+      permissions,
+      updatedAt: serverTimestamp()
+    });
+
+    // 2. 사용자의 sharedWithMe에 추가
+    const userShareRef = doc(db, 'users', userId, 'sharedWithMe', inviteCode);
+    await setDoc(userShareRef, {
+      shareId: inviteCode,
+      ownerId: shareData.ownerId,
+      ownerName: shareData.ownerName,
+      items: shareData.items,
+      permission: shareData.permission,
+      joinedAt: serverTimestamp(),
+      lastAccessedAt: serverTimestamp()
+    });
+
+    console.log('✅ 공유 참여 완료');
+  } catch (error) {
+    console.error('❌ 공유 참여 실패:', error);
+    throw error;
+  }
+}
+
+/**
+ * 공유받은 항목 조회
+ * @returns {Promise<Array>} 공유받은 항목 목록
+ */
+export async function getSharedWithMe() {
+  try {
+    const userId = auth.currentUser?.uid;
+    if (!userId) {
+      throw new Error('로그인이 필요합니다.');
+    }
+
+    const sharedRef = collection(db, 'users', userId, 'sharedWithMe');
+    const sharedSnapshot = await getDocs(sharedRef);
+
+    const sharedItems = [];
+    sharedSnapshot.forEach(doc => {
+      sharedItems.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+
+    console.log('✅ 공유받은 항목 로드:', sharedItems.length + '개');
+    return sharedItems;
+  } catch (error) {
+    console.error('❌ 공유받은 항목 로드 실패:', error);
+    throw error;
+  }
+}
+
+/**
+ * 공유받은 학급의 학생 조회
+ * @param {string} ownerId - 원 소유자 UID
+ * @param {string} classId - 학급 ID (className)
+ * @returns {Promise<Array>} 학생 목록
+ */
+export async function getSharedClassStudents(ownerId, classId) {
+  try {
+    const studentsRef = collection(db, 'users', ownerId, 'students');
+    const q = query(studentsRef, where('className', '==', classId));
+    const studentsSnapshot = await getDocs(q);
+
+    const students = [];
+    studentsSnapshot.forEach(doc => {
+      students.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+
+    console.log(`✅ 공유 학급(${classId}) 학생 로드: ${students.length}명`);
+    return students;
+  } catch (error) {
+    console.error('❌ 공유 학급 학생 로드 실패:', error);
+    throw error;
+  }
+}
+
+/**
+ * 공유받은 팀의 선수 조회
+ * @param {string} ownerId - 원 소유자 UID
+ * @param {string} teamId - 팀 ID
+ * @returns {Promise<Object>} 팀 정보 (선수 포함)
+ */
+export async function getSharedTeam(ownerId, teamId) {
+  try {
+    const teamRef = doc(db, 'users', ownerId, 'teams', teamId);
+    const teamDoc = await getDoc(teamRef);
+
+    if (!teamDoc.exists()) {
+      throw new Error('팀을 찾을 수 없습니다.');
+    }
+
+    const teamData = {
+      id: teamDoc.id,
+      ...teamDoc.data()
+    };
+
+    console.log(`✅ 공유 팀(${teamData.name}) 로드`);
+    return teamData;
+  } catch (error) {
+    console.error('❌ 공유 팀 로드 실패:', error);
+    throw error;
+  }
+}
+
+/**
+ * 공유받은 학급으로 경기 생성 (원 소유자 계정에 저장)
+ * @param {string} ownerId - 원 소유자 UID
+ * @param {Object} gameData - 경기 데이터
+ * @returns {Promise<string>} 생성된 경기 ID
+ */
+export async function createGameForOwner(ownerId, gameData) {
+  try {
+    const currentUserId = auth.currentUser?.uid;
+    if (!currentUserId) {
+      throw new Error('로그인이 필요합니다.');
+    }
+
+    const gamesRef = collection(db, 'users', ownerId, 'games');
+    const gameDocRef = doc(gamesRef);
+
+    await setDoc(gameDocRef, {
+      ...gameData,
+      id: gameDocRef.id,
+      createdBy: currentUserId, // 실제 진행자 UID
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+
+    console.log(`✅ 경기 생성 완료 (소유자: ${ownerId}, ID: ${gameDocRef.id})`);
+    return gameDocRef.id;
+  } catch (error) {
+    console.error('❌ 경기 생성 실패:', error);
+    throw error;
+  }
+}
+
+/**
+ * 공유 권한 변경
+ * @param {string} shareId - 공유 ID
+ * @param {string} targetUserId - 대상 사용자 UID
+ * @param {string} newPermission - 새 권한 ('viewer' | 'editor' | 'owner')
+ * @returns {Promise<void>}
+ */
+export async function updateSharePermission(shareId, targetUserId, newPermission) {
+  try {
+    const shareRef = doc(db, 'shares', shareId);
+    const shareDoc = await getDoc(shareRef);
+
+    if (!shareDoc.exists()) {
+      throw new Error('공유를 찾을 수 없습니다.');
+    }
+
+    const permissions = shareDoc.data().permissions;
+
+    // 기존 권한에서 제거
+    permissions.viewers = permissions.viewers.filter(uid => uid !== targetUserId);
+    permissions.editors = permissions.editors.filter(uid => uid !== targetUserId);
+    permissions.owners = permissions.owners.filter(uid => uid !== targetUserId);
+
+    // 새 권한에 추가
+    if (newPermission === 'viewer') {
+      permissions.viewers.push(targetUserId);
+    } else if (newPermission === 'editor') {
+      permissions.editors.push(targetUserId);
+    } else if (newPermission === 'owner') {
+      permissions.owners.push(targetUserId);
+    }
+
+    await updateDoc(shareRef, {
+      permissions,
+      updatedAt: serverTimestamp()
+    });
+
+    // 사용자의 sharedWithMe도 업데이트
+    const userShareRef = doc(db, 'users', targetUserId, 'sharedWithMe', shareId);
+    await updateDoc(userShareRef, {
+      permission: newPermission,
+      updatedAt: serverTimestamp()
+    });
+
+    console.log('✅ 권한 변경 완료');
+  } catch (error) {
+    console.error('❌ 권한 변경 실패:', error);
+    throw error;
+  }
+}
+
+/**
+ * 사용자를 공유에서 제거
+ * @param {string} shareId - 공유 ID
+ * @param {string} targetUserId - 제거할 사용자 UID
+ * @returns {Promise<void>}
+ */
+export async function removeUserFromShare(shareId, targetUserId) {
+  try {
+    // 1. shares 문서의 permissions에서 제거
+    const shareRef = doc(db, 'shares', shareId);
+    const shareDoc = await getDoc(shareRef);
+    const permissions = shareDoc.data().permissions;
+
+    permissions.viewers = permissions.viewers.filter(uid => uid !== targetUserId);
+    permissions.editors = permissions.editors.filter(uid => uid !== targetUserId);
+    permissions.owners = permissions.owners.filter(uid => uid !== targetUserId);
+
+    await updateDoc(shareRef, {
+      permissions,
+      updatedAt: serverTimestamp()
+    });
+
+    // 2. 사용자의 sharedWithMe에서 삭제
+    const userShareRef = doc(db, 'users', targetUserId, 'sharedWithMe', shareId);
+    await deleteDoc(userShareRef);
+
+    console.log('✅ 공유 해제 완료');
+  } catch (error) {
+    console.error('❌ 공유 해제 실패:', error);
+    throw error;
   }
 }

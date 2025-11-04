@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from './ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { Settings } from 'lucide-react';
+import { Settings, Lock } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -34,6 +34,7 @@ import {
 } from '../types/gameTypes';
 import { findEligibleBadges } from '../utils/autoBadgeChecker';
 import { loadCustomBadges } from '../services/firestoreService';
+import { canEdit, isSharedItem, getPermissionBadgeInfo } from '../utils/permissionHelpers.jsx';
 
 /**
  * SortableAttackRow 컴포넌트
@@ -197,6 +198,11 @@ const GameScreen = ({ gameId, onExit }) => {
   const [showBadgeManageModal, setShowBadgeManageModal] = useState(false); // 배지 관리 모달 표시 여부
   const [selectedPlayerForBadgeId, setSelectedPlayerForBadgeId] = useState(null); // 배지 관리할 선수 ID
 
+  // 권한 체크
+  const [canEditGame, setCanEditGame] = useState(true); // 기본값 true (소유자인 경우)
+  const [teamAPermission, setTeamAPermission] = useState(null); // 팀A 권한 정보
+  const [teamBPermission, setTeamBPermission] = useState(null); // 팀B 권한 정보
+
   // ✅ 선수 ID로 최신 선수 정보 동적 조회 (game 상태가 업데이트되면 자동으로 최신 값 반영)
   const getPlayerById = (playerId) => {
     if (!game || !playerId) return null;
@@ -327,6 +333,23 @@ const GameScreen = ({ gameId, onExit }) => {
           loadBadgesForTeam(currentGame.teamA),
           loadBadgesForTeam(currentGame.teamB)
         ]);
+
+        // 권한 체크: teams 배열에서 해당 팀들의 권한 확인
+        const teamAFromList = teams.find(t => t.name === currentGame.teamA.name);
+        const teamBFromList = teams.find(t => t.name === currentGame.teamB.name);
+
+        // 두 팀 중 하나라도 편집 권한이 없으면 경기 편집 불가
+        const canEditTeamA = teamAFromList ? canEdit(teamAFromList) : true;
+        const canEditTeamB = teamBFromList ? canEdit(teamBFromList) : true;
+        const canEditGameData = canEditTeamA && canEditTeamB;
+
+        setCanEditGame(canEditGameData);
+        setTeamAPermission(teamAFromList);
+        setTeamBPermission(teamBFromList);
+
+        if (!canEditGameData) {
+          console.log('⚠️ 이 경기는 조회 전용입니다. 편집 권한이 없는 팀이 포함되어 있습니다.');
+        }
 
         setGame({
           ...currentGame,
@@ -603,9 +626,18 @@ const GameScreen = ({ gameId, onExit }) => {
     restoreSavedRunners();
   }, [game?.isTopInning]); // isTopInning이 바뀔 때만 실행
 
+  // 권한 체크 헬퍼 함수
+  const checkEditPermission = () => {
+    if (!canEditGame) {
+      alert('⚠️ 이 경기는 조회 전용입니다.\n\n공유받은 팀이 포함되어 있어 경기 내용을 수정할 수 없습니다.\n경기 기록을 보거나 인쇄만 가능합니다.');
+      return false;
+    }
+    return true;
+  };
+
   // 공수교대 핸들러
   const handleSwitchTeams = async () => {
-    if (!game) return;
+    if (!game || !checkEditPermission()) return;
 
     // 현재 공격팀 확인
     const currentAttackTeam = game.isTopInning ? game.teamA : game.teamB;
@@ -658,7 +690,7 @@ const GameScreen = ({ gameId, onExit }) => {
 
   // 이닝 변경 핸들러 (이닝별 자동 라인업 교체 포함)
   const handleChangeInning = async (delta) => {
-    if (!game) return;
+    if (!game || !checkEditPermission()) return;
 
     const newInning = game.currentInning + delta;
 
@@ -748,7 +780,7 @@ const GameScreen = ({ gameId, onExit }) => {
 
   // 경기 종료 핸들러
   const handleEndGame = async () => {
-    if (!game) return;
+    if (!game || !checkEditPermission()) return;
 
     if (!confirm('경기를 종료하시겠습니까?\n(종료 후에도 기록은 확인 가능합니다)')) {
       return;
@@ -913,6 +945,7 @@ const GameScreen = ({ gameId, onExit }) => {
 
   // 이닝 추가 핸들러
   const handleAddInning = async (count = 1) => {
+    if (!checkEditPermission()) return;
     if (!confirm(`이닝을 ${count}회 추가하시겠습니까?`)) return;
 
     try {
@@ -1050,6 +1083,7 @@ const GameScreen = ({ gameId, onExit }) => {
 
   // 이닝 삭제 핸들러
   const handleRemoveInning = async (count = 1) => {
+    if (!checkEditPermission()) return;
     if (game.innings - count < 1) {
       alert('⚠️ 최소 1이닝은 필요합니다.');
       return;
@@ -1267,7 +1301,7 @@ const GameScreen = ({ gameId, onExit }) => {
 
   // 아웃 카운트 변경 핸들러
   const handleChangeOuts = async (delta) => {
-    if (!game) return;
+    if (!game || !checkEditPermission()) return;
 
     try {
       const newGame = { ...game };
@@ -1284,7 +1318,7 @@ const GameScreen = ({ gameId, onExit }) => {
 
   // 스트라이크 카운트 변경 핸들러
   const handleChangeStrikes = async (delta) => {
-    if (!game) return;
+    if (!game || !checkEditPermission()) return;
 
     console.log(`🎯 [스트라이크] 함수 호출: delta=${delta}, 현재=${game.currentStrikes || 0}`);
 
@@ -1464,6 +1498,7 @@ const GameScreen = ({ gameId, onExit }) => {
 
   // 선수 스탯 업데이트 함수 (득점, 쿠키, 수비용)
   const handleUpdatePlayerStat = async (isTeamA, playerIndex, statName, delta) => {
+    if (!checkEditPermission()) return;
     // 완료된 경기는 수정 불가
     if (game.status === 'completed') {
       alert('⚠️ 완료된 경기는 기록을 수정할 수 없습니다.');
@@ -1524,6 +1559,7 @@ const GameScreen = ({ gameId, onExit }) => {
 
   // 안타 추가 핸들러 (주자 자동 이동 포함)
   const handleAddHit = async (playerIndex, hitType) => {
+    if (!checkEditPermission()) return;
     if (game.status === 'completed') {
       alert('⚠️ 완료된 경기는 기록을 수정할 수 없습니다.');
       return;

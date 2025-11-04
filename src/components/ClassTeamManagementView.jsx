@@ -9,11 +9,16 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { ChevronLeft, ChevronRight, Plus, Trash2, X, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, X, GripVertical, ChevronDown, ChevronUp, Lock } from 'lucide-react';
 import { DndContext, closestCenter, closestCorners, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import DeleteConfirmModal from './DeleteConfirmModal';
+import ClassShareSelectionModal from './ClassShareSelectionModal';
+import ClassShareSettingsModal from './ClassShareSettingsModal';
+import ShareManagementModal from './ShareManagementModal';
+import SharedItemsSection from './SharedItemsSection';
+import { isSharedItem, canEdit, canManage, getPermissionBadgeInfo } from '../utils/permissionHelpers.jsx';
 
 /**
  * SortablePlayerRow
@@ -314,6 +319,15 @@ export default function ClassTeamManagementView() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null); // { type: 'student' | 'class', data: {...}, deletedItems: [...] }
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // 공유 시스템 모달 (Phase 2)
+  const [showShareSelectionModal, setShowShareSelectionModal] = useState(false);
+  const [showShareSettingsModal, setShowShareSettingsModal] = useState(false);
+  const [selectedItemsForShare, setSelectedItemsForShare] = useState([]);
+
+  // Phase 6: 공유 관리 모달
+  const [showShareManagementModal, setShowShareManagementModal] = useState(false);
+  const [manageShareItem, setManageShareItem] = useState(null); // { type, id, name }
 
   // ============================================
   // 학급별 학생 그룹화
@@ -990,6 +1004,34 @@ export default function ClassTeamManagementView() {
   };
 
   // ============================================
+  // 공유 시스템 핸들러 (Phase 2)
+  // ============================================
+  const handleShareButtonClick = () => {
+    setShowShareSelectionModal(true);
+  };
+
+  const handleShareSelectionNext = (selectedItems) => {
+    setSelectedItemsForShare(selectedItems);
+    setShowShareSelectionModal(false);
+    setShowShareSettingsModal(true);
+  };
+
+  const handleShareSelectionBack = () => {
+    setShowShareSelectionModal(false);
+  };
+
+  const handleShareSettingsBack = () => {
+    setShowShareSettingsModal(false);
+    setShowShareSelectionModal(true);
+  };
+
+  const handleShareComplete = (shareInfo) => {
+    console.log('✅ Share created:', shareInfo);
+    setShowShareSettingsModal(false);
+    setSelectedItemsForShare([]);
+  };
+
+  // ============================================
   // 팀 삭제
   // ============================================
   const handleDeleteTeam = async (team) => {
@@ -1017,27 +1059,89 @@ export default function ClassTeamManagementView() {
       {/* ============================================ */}
       {/* 탭 헤더 */}
       {/* ============================================ */}
-      <div className="flex gap-2 border-b-2 border-gray-200">
-        <button
-          onClick={() => setActiveTab('class')}
-          className={`px-6 py-3 font-semibold text-sm transition-all ${
-            activeTab === 'class'
-              ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50/50'
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          📚 학급 관리
-        </button>
-        <button
-          onClick={() => setActiveTab('team')}
-          className={`px-6 py-3 font-semibold text-sm transition-all ${
-            activeTab === 'team'
-              ? 'border-b-2 border-purple-500 text-purple-600 bg-purple-50/50'
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          👥 팀 관리
-        </button>
+      <div className="flex justify-between items-center border-b-2 border-gray-200">
+        {/* 탭 버튼들 */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab('class')}
+            className={`px-6 py-3 font-semibold text-sm transition-all ${
+              activeTab === 'class'
+                ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50/50'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            📚 학급 관리
+          </button>
+          <button
+            onClick={() => setActiveTab('team')}
+            className={`px-6 py-3 font-semibold text-sm transition-all ${
+              activeTab === 'team'
+                ? 'border-b-2 border-purple-500 text-purple-600 bg-purple-50/50'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            👥 팀 관리
+          </button>
+          <button
+            onClick={() => setActiveTab('shared')}
+            className={`px-6 py-3 font-semibold text-sm transition-all ${
+              activeTab === 'shared'
+                ? 'border-b-2 border-green-500 text-green-600 bg-green-50/50'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            🤝 공유받은 항목
+          </button>
+        </div>
+
+        {/* 우측 액션 버튼들 */}
+        <div className="flex gap-2 pr-4">
+          {/* 현재 탭에 따라 추가 버튼 표시 */}
+          {activeTab === 'class' && (
+            <Button
+              size="sm"
+              className="bg-green-100 text-green-700 hover:bg-green-200"
+              onClick={() => setShowAddClassModal(true)}
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              새 학급
+            </Button>
+          )}
+          {activeTab === 'team' && (
+            <Button
+              size="sm"
+              className="bg-green-100 text-green-700 hover:bg-green-200"
+              onClick={() => setShowAddTeamModal(true)}
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              새 팀
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowShareSettingsModal(true)}
+            className="border-purple-300 text-purple-700 hover:bg-purple-50"
+          >
+            🤝 공유하기
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              // 전체 항목 관리를 위해 특별한 플래그 설정
+              setManageShareItem({
+                type: 'all',
+                id: null,
+                name: '전체 항목'
+              });
+              setShowShareManagementModal(true);
+            }}
+            className="border-blue-300 text-blue-700 hover:bg-blue-50"
+          >
+            ⚙️ 공유 관리
+          </Button>
+        </div>
       </div>
 
       {/* ============================================ */}
@@ -1059,23 +1163,13 @@ export default function ClassTeamManagementView() {
           </div>
           <div className="flex gap-2">
             {isClassEditMode ? (
-              <>
-                <Button
-                  size="sm"
-                  className="bg-emerald-200 text-emerald-700 hover:bg-emerald-300"
-                  onClick={() => setShowAddClassModal(true)}
-                >
-                  <Plus className="w-4 h-4 mr-1" />
-                  새 학급
-                </Button>
-                <Button
-                  size="sm"
-                  className="bg-sky-200 text-sky-700 hover:bg-sky-300"
-                  onClick={() => setIsClassEditMode(false)}
-                >
-                  완료
-                </Button>
-              </>
+              <Button
+                size="sm"
+                className="bg-sky-200 text-sky-700 hover:bg-sky-300"
+                onClick={() => setIsClassEditMode(false)}
+              >
+                완료
+              </Button>
             ) : (
               <Button
                 size="sm"
@@ -1247,6 +1341,7 @@ export default function ClassTeamManagementView() {
             <p>학급을 선택하면 학생 목록이 표시됩니다</p>
           </Card>
         )}
+
         </div>
       )}
 
@@ -1281,23 +1376,13 @@ export default function ClassTeamManagementView() {
               배지 표시
             </label>
             {isTeamEditMode ? (
-              <>
-                <Button
-                  size="sm"
-                  className="bg-emerald-200 text-emerald-700 hover:bg-emerald-300"
-                  onClick={() => setShowAddTeamModal(true)}
-                >
-                  <Plus className="w-4 h-4 mr-1" />
-                  새 팀
-                </Button>
-                <Button
-                  size="sm"
-                  className="bg-sky-200 text-sky-700 hover:bg-sky-300"
-                  onClick={() => setIsTeamEditMode(false)}
-                >
-                  완료
-                </Button>
-              </>
+              <Button
+                size="sm"
+                className="bg-sky-200 text-sky-700 hover:bg-sky-300"
+                onClick={() => setIsTeamEditMode(false)}
+              >
+                완료
+              </Button>
             ) : (
               <Button
                 size="sm"
@@ -1344,10 +1429,24 @@ export default function ClassTeamManagementView() {
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
-                <div className="flex items-center justify-center gap-1.5 text-sm">
-                  <span className="font-bold text-foreground">{team.name}</span>
-                  <span className="text-muted-foreground">|</span>
-                  <span className="text-[11px] text-muted-foreground">선수 {team.players?.length || 0}명</span>
+                <div className="flex flex-col items-center justify-center gap-1 text-sm">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-foreground">{team.name}</span>
+                    {isSharedItem(team) && (
+                      <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${getPermissionBadgeInfo(team.permission).color}`}>
+                        {getPermissionBadgeInfo(team.permission).icon}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <span>선수 {team.players?.length || 0}명</span>
+                    {isSharedItem(team) && (
+                      <>
+                        <span>•</span>
+                        <span className="text-[10px]">{team.ownerName}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </Card>
             ))}
@@ -1393,34 +1492,57 @@ export default function ClassTeamManagementView() {
         {selectedTeam ? (
           <Card className="p-4 max-h-[calc(100vh-16rem)] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-foreground">{selectedTeam.name} 상세</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xl font-bold text-foreground">{selectedTeam.name} 상세</h3>
+                {isSharedItem(selectedTeam) && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className={`text-xs ${getPermissionBadgeInfo(selectedTeam.permission).color}`}>
+                      {getPermissionBadgeInfo(selectedTeam.permission).icon} {getPermissionBadgeInfo(selectedTeam.permission).label}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">by {selectedTeam.ownerName}</span>
+                  </div>
+                )}
+              </div>
               <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleRandomLineup}
-                  className="bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100"
-                  disabled={!selectedTeam.players || selectedTeam.players.length === 0}
-                >
-                  🎲 랜덤 설정
-                </Button>
-                <Button size="sm" variant="outline" onClick={handleOpenImportPlayers}>
-                  <Plus className="w-4 h-4 mr-1" />
-                  학급에서 가져오기
-                </Button>
-                <Button size="sm" variant="outline" onClick={handleOpenAddPlayer}>
-                  <Plus className="w-4 h-4 mr-1" />
-                  새로 추가
-                </Button>
-                {isTeamEditMode && (
-                  <Button
-                    size="sm"
-                    className="bg-rose-200 text-rose-700 hover:bg-rose-300"
-                    onClick={() => handleDeleteTeam(selectedTeam)}
-                  >
-                    <Trash2 className="w-4 h-4 mr-1" />
-                    팀 삭제
-                  </Button>
+                {canEdit(selectedTeam) ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRandomLineup}
+                      className="bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100"
+                      disabled={!selectedTeam.players || selectedTeam.players.length === 0}
+                    >
+                      🎲 랜덤 설정
+                    </Button>
+                    {canManage(selectedTeam) && (
+                      <>
+                        <Button size="sm" variant="outline" onClick={handleOpenImportPlayers}>
+                          <Plus className="w-4 h-4 mr-1" />
+                          학급에서 가져오기
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={handleOpenAddPlayer}>
+                          <Plus className="w-4 h-4 mr-1" />
+                          새로 추가
+                        </Button>
+                      </>
+                    )}
+                    {isTeamEditMode && canManage(selectedTeam) && (
+                      <Button
+                        size="sm"
+                        className="bg-rose-200 text-rose-700 hover:bg-rose-300"
+                        onClick={() => handleDeleteTeam(selectedTeam)}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        팀 삭제
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Lock className="w-4 h-4" />
+                    <span>조회 전용</span>
+                  </div>
                 )}
               </div>
             </div>
@@ -1472,6 +1594,20 @@ export default function ClassTeamManagementView() {
             팀을 선택하면 상세 정보가 표시됩니다.
           </Card>
         )}
+        </div>
+      )}
+
+      {/* ============================================ */}
+      {/* 공유받은 항목 탭 */}
+      {/* ============================================ */}
+      {activeTab === 'shared' && (
+        <div className="flex-1 flex flex-col gap-3 bg-green-50/30 rounded-lg p-3">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-bold">🤝 공유받은 항목</h2>
+          </div>
+
+          {/* SharedItemsSection 컴포넌트 */}
+          <SharedItemsSection />
         </div>
       )}
 
@@ -2114,6 +2250,43 @@ export default function ClassTeamManagementView() {
         }
         deletedItems={deleteTarget?.deletedItems || []}
         isDeleting={isDeleting}
+      />
+
+      {/* ============================================ */}
+      {/* 공유 시스템 모달 (Phase 2) */}
+      {/* ============================================ */}
+      <ClassShareSelectionModal
+        open={showShareSelectionModal}
+        onOpenChange={setShowShareSelectionModal}
+        classes={classNames.map(className => ({
+          id: className,
+          name: className,
+          studentCount: studentsByClass[className]?.length || 0
+        }))}
+        teams={teams.map(team => ({
+          id: team.id,
+          name: team.name,
+          playerCount: team.players?.length || 0
+        }))}
+        onNext={handleShareSelectionNext}
+      />
+
+      <ClassShareSettingsModal
+        open={showShareSettingsModal}
+        onOpenChange={setShowShareSettingsModal}
+        selectedItems={selectedItemsForShare}
+        onBack={handleShareSettingsBack}
+        onComplete={handleShareComplete}
+      />
+
+      {/* Phase 6: 공유 관리 모달 */}
+      <ShareManagementModal
+        open={showShareManagementModal}
+        onOpenChange={setShowShareManagementModal}
+        classId={manageShareItem?.type === 'class' ? manageShareItem.id : null}
+        teamId={manageShareItem?.type === 'team' ? manageShareItem.id : null}
+        itemType={manageShareItem?.type}
+        itemName={manageShareItem?.name}
       />
     </div>
   );

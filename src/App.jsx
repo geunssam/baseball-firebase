@@ -1,9 +1,11 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { StudentAuthProvider, useStudentAuth } from './contexts/StudentAuthContext';
 import { GameProvider } from './contexts/GameContext';
 import UnifiedLoginPage from './components/auth/UnifiedLoginPage';
 import MainApp from './components/MainApp';
 import StudentView from './components/StudentView';
+import ShareInvitePage from './components/ShareInvitePage';
 import PrivacyConsentGuard from './components/PrivacyConsentGuard';
 import { Toaster } from 'react-hot-toast';
 import './index.css';
@@ -24,34 +26,45 @@ function AppContent() {
     );
   }
 
-  // 학생으로 로그인한 경우
-  if (studentData) {
-    return <StudentView />;
-  }
+  return (
+    <Routes>
+      {/* 공유 초대 페이지 (누구나 접근 가능, 로그인 필요는 컴포넌트 내부에서 처리) */}
+      <Route path="/share/:inviteCode" element={<ShareInvitePage />} />
 
-  // 교사로 로그인한 경우
-  if (teacherUser) {
-    return (
-      <PrivacyConsentGuard>
-        <MainApp />
-      </PrivacyConsentGuard>
-    );
-  }
+      {/* 학생 뷰 */}
+      {studentData && (
+        <Route path="*" element={<StudentView />} />
+      )}
 
-  // 로그인 안 한 경우 통합 로그인 페이지 표시
-  return <UnifiedLoginPage />;
+      {/* 교사 메인 앱 */}
+      {teacherUser && (
+        <Route path="*" element={
+          <PrivacyConsentGuard>
+            <MainApp />
+          </PrivacyConsentGuard>
+        } />
+      )}
+
+      {/* 로그인 안 한 경우 */}
+      {!teacherUser && !studentData && (
+        <Route path="*" element={<UnifiedLoginPage />} />
+      )}
+    </Routes>
+  );
 }
 
 function App() {
   return (
-    <AuthProvider>
-      <StudentAuthProvider>
-        <GameProvider>
-          <Toaster position="top-right" />
-          <AppContent />
-        </GameProvider>
-      </StudentAuthProvider>
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <StudentAuthProvider>
+          <GameProvider>
+            <Toaster position="top-right" />
+            <AppContent />
+          </GameProvider>
+        </StudentAuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 
