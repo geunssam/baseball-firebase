@@ -110,124 +110,82 @@ const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
                     ? playerWithPoints.filter(p => p.totalPoints === topScore)
                     : [];
 
+                  // 날짜 변환
+                  let gameDate;
+                  try {
+                    const createdAt = game.createdAt;
+                    if (typeof createdAt === 'string') {
+                      gameDate = new Date(createdAt);
+                    } else if (createdAt?.toMillis) {
+                      gameDate = new Date(createdAt.toMillis());
+                    } else if (createdAt?.seconds) {
+                      gameDate = new Date(createdAt.seconds * 1000);
+                    } else if (typeof createdAt === 'number') {
+                      gameDate = new Date(createdAt);
+                    } else {
+                      gameDate = new Date();
+                    }
+                  } catch (e) {
+                    gameDate = new Date();
+                  }
+
                   return (
                     <details
                       key={game.id || idx}
-                      className="border-2 border-gray-300 rounded-lg bg-white hover:shadow transition-shadow group"
+                      className="border-2 border-gray-300 rounded-xl bg-white hover:shadow-md transition-shadow"
                     >
-                      <summary className="cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition-colors list-none">
-                        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-                          {/* 폴딩 아이콘 */}
-                          <div className="flex-shrink-0 text-gray-400 group-open:rotate-90 transition-transform">
-                            ▶
-                          </div>
+                      <summary className="cursor-pointer p-6 hover:bg-gray-50 rounded-xl transition-colors list-none">
+                        {/* 1열 가로 레이아웃 - 고정 너비 */}
+                        <div className="flex items-center gap-4 text-xl">
+                          {/* 승리 배지 */}
+                          <span className={`w-12 text-center flex-shrink-0 text-4xl ${winner !== 'draw' ? '' : 'invisible'}`}>
+                            🏆
+                          </span>
 
-                          {/* 팀명과 점수 (테이블 형식 고정) */}
-                          <div className="flex items-center gap-1">
-                            <span className="font-semibold text-sm w-16 text-center truncate" title={game.teamA?.name}>
+                          {/* 팀명과 점수 - 고정 너비로 균형 */}
+                          <div className="flex items-center gap-3">
+                            <span className="font-bold w-32 text-center truncate text-2xl" title={game.teamA?.name}>
                               {game.teamA?.name}
                             </span>
-                            <span className={`font-bold text-lg w-6 text-center ${winner === 'A' ? 'text-blue-600' : 'text-gray-600'}`}>
+                            <span className={`font-black text-4xl w-16 text-center ${winner === 'A' ? 'text-blue-600' : 'text-gray-600'}`}>
                               {scoreA}
                             </span>
-                            <span className="text-gray-400 text-xs w-3 text-center">:</span>
-                            <span className={`font-bold text-lg w-6 text-center ${winner === 'B' ? 'text-red-600' : 'text-gray-600'}`}>
+                            <span className="text-gray-400 text-xl w-12 text-center font-bold">vs</span>
+                            <span className={`font-black text-4xl w-16 text-center ${winner === 'B' ? 'text-red-600' : 'text-gray-600'}`}>
                               {scoreB}
                             </span>
-                            <span className="font-semibold text-sm w-16 text-center truncate" title={game.teamB?.name}>
+                            <span className="font-bold w-32 text-center truncate text-2xl" title={game.teamB?.name}>
                               {game.teamB?.name}
                             </span>
                           </div>
 
-                          {/* 날짜/시간 정보 (고정 너비) */}
-                          <div className="flex items-center gap-2 text-xs text-gray-600">
-                            <span className="inline-flex items-center gap-0.5 w-16">
-                              <span>📅</span>
-                              <span>{(() => {
-                              try {
-                                const createdAt = game.createdAt;
-                                let timestamp;
-                                if (typeof createdAt === 'string') {
-                                  timestamp = new Date(createdAt);
-                                } else if (createdAt?.toMillis) {
-                                  timestamp = new Date(createdAt.toMillis());
-                                } else if (createdAt?.seconds) {
-                                  timestamp = new Date(createdAt.seconds * 1000);
-                                } else if (typeof createdAt === 'number') {
-                                  timestamp = new Date(createdAt);
-                                } else {
-                                  timestamp = new Date();
-                                }
-                                return `${timestamp.getMonth() + 1}/${timestamp.getDate()}`;
-                              } catch (e) {
-                                return '-';
-                              }
-                            })()}</span>
-                            </span>
-                            <span className="inline-flex items-center gap-0.5 w-16">
-                              <span>🏁</span>
-                              <span>{(() => {
-                              try {
-                                const createdAt = game.createdAt;
-                                let timestamp;
-                                if (typeof createdAt === 'string') {
-                                  timestamp = new Date(createdAt);
-                                } else if (createdAt?.toMillis) {
-                                  timestamp = new Date(createdAt.toMillis());
-                                } else if (createdAt?.seconds) {
-                                  timestamp = new Date(createdAt.seconds * 1000);
-                                } else if (typeof createdAt === 'number') {
-                                  timestamp = new Date(createdAt);
-                                } else {
-                                  timestamp = new Date();
-                                }
-                                return timestamp.toLocaleTimeString('ko-KR', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  hour12: false
-                                });
-                              } catch (e) {
-                                return '-';
-                              }
-                            })()}</span>
-                            </span>
-                            <span className="inline-flex items-center gap-0.5 w-16">
-                              {game.finishedAt ? (
-                                <>
-                                  <span>✅</span>
-                                  <span>{(() => {
-                                    try {
-                                      const finishedAt = game.finishedAt;
-                                      let timestamp;
-                                      if (typeof finishedAt === 'string') {
-                                        timestamp = new Date(finishedAt);
-                                      } else if (finishedAt?.toMillis) {
-                                        timestamp = new Date(finishedAt.toMillis());
-                                      } else if (finishedAt?.seconds) {
-                                        timestamp = new Date(finishedAt.seconds * 1000);
-                                      } else if (typeof finishedAt === 'number') {
-                                        timestamp = new Date(finishedAt);
-                                      } else {
-                                        timestamp = new Date();
-                                      }
-                                      return timestamp.toLocaleTimeString('ko-KR', {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                        hour12: false
-                                      });
-                                    } catch (e) {
-                                      return '-';
-                                    }
-                                  })()}</span>
-                                </>
-                              ) : (
-                                <span></span>
-                              )}
-                            </span>
-                            <span className="inline-flex items-center gap-0.5 w-16">
-                              <span>⚾</span>
-                              <span>{game.innings || 3}이닝</span>
-                            </span>
+                          <span className="text-gray-300 w-6 text-center text-2xl">|</span>
+
+                          {/* 날짜 */}
+                          <span className="text-gray-700 flex items-center justify-center gap-2 w-44 font-semibold">
+                            <span className="text-2xl">📅</span>
+                            <span className="text-center">{gameDate.toLocaleDateString('ko-KR')}</span>
+                          </span>
+
+                          <span className="text-gray-300 w-6 text-center text-2xl">|</span>
+
+                          {/* 시간 */}
+                          <span className="text-gray-700 flex items-center justify-center gap-2 w-36 font-semibold">
+                            <span className="text-2xl">🕐</span>
+                            <span className="text-center">{gameDate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span>
+                          </span>
+
+                          <span className="text-gray-300 w-6 text-center text-2xl">|</span>
+
+                          {/* 이닝 */}
+                          <span className="text-gray-700 flex items-center justify-center gap-2 w-32 font-semibold">
+                            <span className="text-2xl">⚾</span>
+                            <span className="text-center">{game.innings || 3}이닝</span>
+                          </span>
+
+                          {/* 돋보기 아이콘 - 우측 끝 */}
+                          <div className="ml-auto text-4xl text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0">
+                            🔍
                           </div>
                         </div>
                       </summary>
@@ -236,23 +194,23 @@ const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
                       <div className="p-2 pt-0 space-y-2" onClick={(e) => e.stopPropagation()}>
                         {/* MVP 정보 (공동 MVP 지원) */}
                         {gameMVPs.length > 0 && (
-                          <div className="bg-yellow-50 border border-yellow-300 rounded p-2">
-                            <div className="text-xs text-yellow-800 font-semibold mb-1 flex items-center gap-1">
-                              <span className="text-lg">👑</span>
+                          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6">
+                            <div className="text-2xl text-yellow-800 font-bold mb-4 flex items-center gap-3">
+                              <span className="text-4xl">👑</span>
                               <span>
                                 {gameMVPs.length === 1 ? '이 경기 MVP' : `공동 MVP (${gameMVPs.length}명)`}
                               </span>
                             </div>
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex flex-wrap gap-4">
                               {gameMVPs.map((mvp, idx) => (
-                                <div key={idx} className="bg-white rounded px-2 py-1 shadow-sm flex-1 min-w-[150px]">
-                                  <div className="font-semibold text-yellow-900 text-xs mb-0.5">{mvp.name}</div>
-                                  <div className="text-xs text-gray-600 flex items-center gap-1">
-                                    <span>⚾{mvp.stats?.hits || 0}</span>
-                                    <span>🏃{mvp.stats?.runs || 0}</span>
-                                    <span>🛡️{mvp.stats?.goodDefense || 0}</span>
-                                    <span>🍪{mvp.stats?.bonusCookie || 0}</span>
-                                    <span className="ml-auto font-bold text-orange-600">{mvp.totalPoints}점</span>
+                                <div key={idx} className="bg-white rounded-lg px-6 py-4 shadow-md flex-1 min-w-[300px] flex items-center gap-4">
+                                  <div className="font-bold text-yellow-900 text-2xl">{mvp.name}</div>
+                                  <div className="text-xl text-gray-700 flex items-center gap-4 font-semibold">
+                                    <span>⚾ {mvp.stats?.hits || 0}</span>
+                                    <span>🏃 {mvp.stats?.runs || 0}</span>
+                                    <span>🛡️ {mvp.stats?.goodDefense || 0}</span>
+                                    <span>🍪 {mvp.stats?.bonusCookie || 0}</span>
+                                    <span className="font-black text-orange-600 text-2xl">{mvp.totalPoints}점</span>
                                   </div>
                                 </div>
                               ))}
@@ -261,39 +219,39 @@ const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
                         )}
 
                         {/* 경기 세부 내용 */}
-                        <details className="mt-2" open>
-                          <summary className="text-xs text-blue-600 cursor-pointer hover:text-blue-800 font-semibold">
+                        <details className="mt-4" open>
+                          <summary className="text-xl text-blue-600 cursor-pointer hover:text-blue-800 font-bold">
                             📊 경기 세부 내용 보기
                           </summary>
 
-                          <div className="mt-3 space-y-4">
+                          <div className="mt-6 space-y-6">
                             {/* 이닝별 점수 테이블 */}
                             <div>
-                              <h4 className="text-sm font-semibold mb-2">이닝별 점수</h4>
-                              <table className="w-full text-center border-collapse text-xs">
+                              <h4 className="text-2xl font-bold mb-4">이닝별 점수</h4>
+                              <table className="w-full text-center border-collapse text-2xl">
                                 <thead className="bg-gray-100">
                                   <tr>
-                                    <th className="border border-gray-300 p-1">팀</th>
+                                    <th className="border-2 border-gray-300 p-4 font-black">팀</th>
                                     {Array.from({ length: game.innings }, (_, i) => (
-                                      <th key={i} className="border border-gray-300 p-1">{i + 1}회</th>
+                                      <th key={i} className="border-2 border-gray-300 p-4 font-bold">{i + 1}회</th>
                                     ))}
-                                    <th className="border border-gray-300 p-1 bg-yellow-100">총점</th>
+                                    <th className="border-2 border-gray-300 p-4 bg-yellow-100 font-black">총점</th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   <tr className={winner === 'A' ? 'bg-blue-50' : ''}>
-                                    <td className="border border-gray-300 p-1 font-semibold">{game.teamA?.name}</td>
+                                    <td className="border-2 border-gray-300 p-4 font-black">{game.teamA?.name}</td>
                                     {game.scoreBoard?.teamA?.map((s, i) => (
-                                      <td key={i} className="border border-gray-300 p-1">{s}</td>
+                                      <td key={i} className="border-2 border-gray-300 p-4 font-bold">{s}</td>
                                     ))}
-                                    <td className="border border-gray-300 p-1 font-bold">{scoreA}</td>
+                                    <td className="border-2 border-gray-300 p-4 font-black text-3xl bg-yellow-50">{scoreA}</td>
                                   </tr>
                                   <tr className={winner === 'B' ? 'bg-red-50' : ''}>
-                                    <td className="border border-gray-300 p-1 font-semibold">{game.teamB?.name}</td>
+                                    <td className="border-2 border-gray-300 p-4 font-black">{game.teamB?.name}</td>
                                     {game.scoreBoard?.teamB?.map((s, i) => (
-                                      <td key={i} className="border border-gray-300 p-1">{s}</td>
+                                      <td key={i} className="border-2 border-gray-300 p-4 font-bold">{s}</td>
                                     ))}
-                                    <td className="border border-gray-300 p-1 font-bold">{scoreB}</td>
+                                    <td className="border-2 border-gray-300 p-4 font-black text-3xl bg-yellow-50">{scoreB}</td>
                                   </tr>
                                 </tbody>
                               </table>
@@ -301,42 +259,36 @@ const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
 
                             {/* 팀A 선수 기록 */}
                             <div>
-                              <h4 className="text-sm font-semibold mb-2 text-blue-700">
+                              <h4 className="text-2xl font-bold mb-4 text-blue-700">
                                 {game.teamA?.name} 팀 선수 기록
                               </h4>
                               <div className="overflow-x-auto">
-                                <table className="w-full text-sm border-collapse">
+                                <table className="w-full text-2xl border-collapse">
                                   <thead className="bg-blue-50">
-                                    <tr>
-                                      <th className="border border-gray-300 p-2 text-center">타순</th>
-                                      <th className="border border-gray-300 p-2 text-center">이름</th>
-                                      <th className="border border-gray-300 p-2 text-center">포지션</th>
-                                      <th className="border border-gray-300 p-2 text-center">타석</th>
-                                      <th className="border border-gray-300 p-2 text-center">안타</th>
-                                      <th className="border border-gray-300 p-2 text-center">득점</th>
-                                      <th className="border border-gray-300 p-2 text-center">타점</th>
-                                      <th className="border border-gray-300 p-2 text-center">삼진</th>
-                                      <th className="border border-gray-300 p-2 text-center">아웃</th>
-                                      <th className="border border-gray-300 p-2 text-center">획득 배지</th>
+                                    <tr className="font-bold">
+                                      <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-36">이름</th>
+                                      <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-32">포지션</th>
+                                      <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-24">안타</th>
+                                      <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-24">득점</th>
+                                      <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-24">수비</th>
+                                      <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-24">쿠키</th>
+                                      <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-32">획득 배지</th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {game.teamA?.lineup?.sort((a, b) => (a.battingOrder || 999) - (b.battingOrder || 999)).map((player, idx) => (
                                       <tr key={idx} className="hover:bg-blue-50/50">
-                                        <td className="border border-gray-300 p-2 text-center">{player.battingOrder || '-'}</td>
-                                        <td className="border border-gray-300 p-2 text-center font-medium">{player.name}</td>
-                                        <td className="border border-gray-300 p-2 text-center">{player.position || '-'}</td>
-                                        <td className="border border-gray-300 p-2 text-center">{player.stats?.atBats || 0}</td>
-                                        <td className="border border-gray-300 p-2 text-center font-semibold text-green-600">{player.stats?.hits || 0}</td>
-                                        <td className="border border-gray-300 p-2 text-center font-semibold text-blue-600">{player.stats?.runs || 0}</td>
-                                        <td className="border border-gray-300 p-2 text-center font-semibold text-purple-600">{player.stats?.rbis || 0}</td>
-                                        <td className="border border-gray-300 p-2 text-center text-red-600">{player.stats?.strikeouts || 0}</td>
-                                        <td className="border border-gray-300 p-2 text-center">{player.stats?.outs || 0}</td>
-                                        <td className="border border-gray-300 p-2 text-center">
+                                        <td className="border-2 border-gray-300 p-4 text-center font-bold text-gray-900">{player.name}</td>
+                                        <td className="border-2 border-gray-300 p-4 text-center font-semibold text-gray-900">{player.position || '-'}</td>
+                                        <td className="border-2 border-gray-300 p-4 text-center font-bold text-green-600">{player.stats?.hits || 0}</td>
+                                        <td className="border-2 border-gray-300 p-4 text-center font-bold text-blue-600">{player.stats?.runs || 0}</td>
+                                        <td className="border-2 border-gray-300 p-4 text-center font-bold text-amber-600">{player.stats?.goodDefense || 0}</td>
+                                        <td className="border-2 border-gray-300 p-4 text-center font-bold text-purple-600">{player.stats?.bonusCookie || 0}</td>
+                                        <td className="border-2 border-gray-300 p-4 text-center">
                                           {player.newBadges && player.newBadges.length > 0 ? (
                                             <div className="flex flex-wrap gap-1 justify-center">
                                               {player.newBadges.map((badge, bidx) => (
-                                                <span key={bidx} className="text-lg" title={badge.name}>
+                                                <span key={bidx} className="text-2xl" title={badge.name}>
                                                   {badge.emoji}
                                                 </span>
                                               ))}
@@ -354,42 +306,36 @@ const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
 
                             {/* 팀B 선수 기록 */}
                             <div>
-                              <h4 className="text-sm font-semibold mb-2 text-red-700">
+                              <h4 className="text-2xl font-bold mb-4 text-red-700">
                                 {game.teamB?.name} 팀 선수 기록
                               </h4>
                               <div className="overflow-x-auto">
-                                <table className="w-full text-sm border-collapse">
+                                <table className="w-full text-2xl border-collapse">
                                   <thead className="bg-red-50">
-                                    <tr>
-                                      <th className="border border-gray-300 p-2 text-center">타순</th>
-                                      <th className="border border-gray-300 p-2 text-center">이름</th>
-                                      <th className="border border-gray-300 p-2 text-center">포지션</th>
-                                      <th className="border border-gray-300 p-2 text-center">타석</th>
-                                      <th className="border border-gray-300 p-2 text-center">안타</th>
-                                      <th className="border border-gray-300 p-2 text-center">득점</th>
-                                      <th className="border border-gray-300 p-2 text-center">타점</th>
-                                      <th className="border border-gray-300 p-2 text-center">삼진</th>
-                                      <th className="border border-gray-300 p-2 text-center">아웃</th>
-                                      <th className="border border-gray-300 p-2 text-center">획득 배지</th>
+                                    <tr className="font-bold">
+                                      <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-36">이름</th>
+                                      <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-32">포지션</th>
+                                      <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-24">안타</th>
+                                      <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-24">득점</th>
+                                      <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-24">수비</th>
+                                      <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-24">쿠키</th>
+                                      <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-32">획득 배지</th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {game.teamB?.lineup?.sort((a, b) => (a.battingOrder || 999) - (b.battingOrder || 999)).map((player, idx) => (
                                       <tr key={idx} className="hover:bg-red-50/50">
-                                        <td className="border border-gray-300 p-2 text-center">{player.battingOrder || '-'}</td>
-                                        <td className="border border-gray-300 p-2 text-center font-medium">{player.name}</td>
-                                        <td className="border border-gray-300 p-2 text-center">{player.position || '-'}</td>
-                                        <td className="border border-gray-300 p-2 text-center">{player.stats?.atBats || 0}</td>
-                                        <td className="border border-gray-300 p-2 text-center font-semibold text-green-600">{player.stats?.hits || 0}</td>
-                                        <td className="border border-gray-300 p-2 text-center font-semibold text-blue-600">{player.stats?.runs || 0}</td>
-                                        <td className="border border-gray-300 p-2 text-center font-semibold text-purple-600">{player.stats?.rbis || 0}</td>
-                                        <td className="border border-gray-300 p-2 text-center text-red-600">{player.stats?.strikeouts || 0}</td>
-                                        <td className="border border-gray-300 p-2 text-center">{player.stats?.outs || 0}</td>
-                                        <td className="border border-gray-300 p-2 text-center">
+                                        <td className="border-2 border-gray-300 p-4 text-center font-bold text-gray-900">{player.name}</td>
+                                        <td className="border-2 border-gray-300 p-4 text-center font-semibold text-gray-900">{player.position || '-'}</td>
+                                        <td className="border-2 border-gray-300 p-4 text-center font-bold text-green-600">{player.stats?.hits || 0}</td>
+                                        <td className="border-2 border-gray-300 p-4 text-center font-bold text-blue-600">{player.stats?.runs || 0}</td>
+                                        <td className="border-2 border-gray-300 p-4 text-center font-bold text-amber-600">{player.stats?.goodDefense || 0}</td>
+                                        <td className="border-2 border-gray-300 p-4 text-center font-bold text-purple-600">{player.stats?.bonusCookie || 0}</td>
+                                        <td className="border-2 border-gray-300 p-4 text-center">
                                           {player.newBadges && player.newBadges.length > 0 ? (
                                             <div className="flex flex-wrap gap-1 justify-center">
                                               {player.newBadges.map((badge, bidx) => (
-                                                <span key={bidx} className="text-lg" title={badge.name}>
+                                                <span key={bidx} className="text-2xl" title={badge.name}>
                                                   {badge.emoji}
                                                 </span>
                                               ))}
