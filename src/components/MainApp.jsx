@@ -1056,6 +1056,7 @@ const MainApp = () => {
           <StatsView
             finishedGames={finishedGames}
             teams={teams}
+            students={students}
             onBack={() => setDashboardView('dashboard')}
           />
         )}
@@ -1224,6 +1225,7 @@ const MainApp = () => {
                 <StatsView
                   finishedGames={finishedGames.filter(g => g.id === selectedRecordGameId)}
                   teams={teams}
+                  students={students}
                   defaultTab="games"
                 />
               )}

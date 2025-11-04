@@ -3,7 +3,7 @@ import { calculateMVPScore } from '../utils/mvpCalculator';
 import { calculatePlayerPoints } from '../utils/statsHelpers';
 import SelectedGamesModal from './SelectedGamesModal';
 
-const StatsView = ({ finishedGames, teams, onBack }) => {
+const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
   const [statsSubTab, setStatsSubTab] = useState('scoreboard');
   const [selectedGameIds, setSelectedGameIds] = useState([]);
   const [showSelectedGamesModal, setShowSelectedGamesModal] = useState(false);
@@ -602,6 +602,7 @@ const StatsView = ({ finishedGames, teams, onBack }) => {
         <SelectedGamesModal
           selectedGames={finishedGames.filter(g => selectedGameIds.includes(g.id))}
           teams={teams}
+          students={students}
           onClose={() => setShowSelectedGamesModal(false)}
         />
       )}
