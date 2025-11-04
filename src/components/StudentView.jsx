@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useStudentAuth } from '../contexts/StudentAuthContext';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, orderBy, limit } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { BADGES } from '../utils/badgeSystem';
+import StudentGameHistory from './StudentGameHistory';
+import { getPlayerDetailedHistory } from '../services/firestoreService';
 
 // 🔹 배지 티어 정의
 const BADGE_TIERS = {
@@ -45,9 +47,8 @@ export default function StudentView() {
       setError('');
 
       // 1️⃣ 개인 통계 조회 (playerHistory에서 집계)
-      const historyRef = collection(db, 'users', studentData.teacherId, 'playerHistory');
-      const historyDocRef = query(historyRef, where('playerId', '==', studentData.playerId));
-      const historySnapshot = await getDocs(historyDocRef);
+      const historyDocRef = doc(db, 'users', studentData.teacherId, 'playerHistory', studentData.playerId);
+      const historySnapshot = await getDoc(historyDocRef);
 
       let totalStats = {
         total_games: 0,
@@ -58,8 +59,8 @@ export default function StudentView() {
         total_bonus_cookie: 0,
       };
 
-      if (!historySnapshot.empty) {
-        const historyData = historySnapshot.docs[0].data();
+      if (historySnapshot.exists()) {
+        const historyData = historySnapshot.data();
         const games = historyData.games || [];
 
         games.forEach(game => {
@@ -137,16 +138,43 @@ export default function StudentView() {
 
       setStats(totalStats);
 
-      // 2️⃣ 배지 조회
-      const badgesRef = collection(db, 'users', studentData.teacherId, 'playerBadges');
-      const badgesDocRef = query(badgesRef, where('playerId', '==', studentData.playerId));
-      const badgesSnapshot = await getDocs(badgesDocRef);
+      // 2️⃣ 배지 조회 (수여일 포함)
+      const badgesDocRef = doc(db, 'users', studentData.teacherId, 'playerBadges', studentData.playerId);
+      const badgesSnapshot = await getDoc(badgesDocRef);
 
       let earnedBadges = [];
-      if (!badgesSnapshot.empty) {
-        const badgesData = badgesSnapshot.docs[0].data();
+      if (badgesSnapshot.exists()) {
+        const badgesData = badgesSnapshot.data();
         earnedBadges = badgesData.badges || [];
       }
+
+      // 배지별 수여일 찾기 (getPlayerDetailedHistory 사용)
+      const detailedHistory = await getPlayerDetailedHistory(studentData.teacherId, studentData.playerId);
+
+      console.log('🔍 [배지 날짜 디버깅] 상세 경기 기록 개수:', detailedHistory.length);
+
+      const badgeAwardDates = {};
+
+      // 오래된 순서로 정렬하여 처음 수여된 날짜 찾기
+      const sortedHistory = [...detailedHistory].sort((a, b) =>
+        new Date(a.date) - new Date(b.date)
+      );
+
+      sortedHistory.forEach((game, idx) => {
+        console.log(`🔍 [경기 ${idx}] date:`, game.date, '/ newBadges:', game.newBadges);
+
+        if (game.newBadges && Array.isArray(game.newBadges) && game.newBadges.length > 0) {
+          game.newBadges.forEach(badge => {
+            const badgeId = typeof badge === 'string' ? badge : badge.id;
+            console.log(`  ✅ 배지 발견: ${badgeId} / 날짜: ${game.date}`);
+            if (!badgeAwardDates[badgeId]) {
+              badgeAwardDates[badgeId] = game.date;
+            }
+          });
+        }
+      });
+
+      console.log('🔍 [최종] badgeAwardDates 객체:', badgeAwardDates);
 
       // 배지 상세 정보와 결합
       const badgesWithDetails = earnedBadges.map(badgeId => {
@@ -154,8 +182,15 @@ export default function StudentView() {
         return {
           badge_id: badgeId,
           badge: badge || { name: '알 수 없는 배지', icon: '🏅', tier: 1 },
-          earned_at: new Date().toISOString(), // 획득 날짜 (추후 추가 가능)
+          earned_at: badgeAwardDates[badgeId] || null,
         };
+      });
+
+      // 수여일 기준 내림차순 정렬 (최신 배지가 앞에)
+      badgesWithDetails.sort((a, b) => {
+        if (!a.earned_at) return 1;
+        if (!b.earned_at) return -1;
+        return new Date(b.earned_at) - new Date(a.earned_at);
       });
 
       setBadges(badgesWithDetails);
@@ -178,11 +213,8 @@ export default function StudentView() {
         const studentDoc = studentsSnapshot.docs.find(doc => doc.id === studentId);
         const studentInfo = studentDoc.data();
 
-        const historyQuery = query(
-          collection(db, 'users', studentData.teacherId, 'playerHistory'),
-          where('playerId', '==', studentInfo.playerId || studentId)
-        );
-        const historySnap = await getDocs(historyQuery);
+        const historyDocRef = doc(db, 'users', studentData.teacherId, 'playerHistory', studentInfo.playerId || studentId);
+        const historySnap = await getDoc(historyDocRef);
 
         let studentStats = {
           student_id: studentId,
@@ -195,8 +227,8 @@ export default function StudentView() {
           total_points: 0,
         };
 
-        if (!historySnap.empty) {
-          const games = historySnap.docs[0].data().games || [];
+        if (historySnap.exists()) {
+          const games = historySnap.data().games || [];
           games.forEach(game => {
             studentStats.total_games++;
             studentStats.total_hits += game.stats?.hits || 0;
@@ -246,7 +278,7 @@ export default function StudentView() {
 
       // 총점 기준 내림차순 정렬
       rankingData.sort((a, b) => b.total_points - a.total_points);
-      setClassRanking(rankingData.slice(0, 10)); // 상위 10명만
+      setClassRanking(rankingData); // 전체 학생 표시
 
     } catch (err) {
       console.error('❌ Failed to load student data:', err);
@@ -257,16 +289,16 @@ export default function StudentView() {
     }
   };
 
-  // 🔹 배지 등급별 색상
+  // 🔹 배지 등급별 색상 (파스텔톤)
   const getTierColor = (tier) => {
     const tierColors = {
-      [BADGE_TIERS.BEGINNER]: 'from-gray-400 to-gray-500',
-      [BADGE_TIERS.SKILLED]: 'from-green-400 to-green-500',
-      [BADGE_TIERS.MASTER]: 'from-blue-400 to-blue-500',
-      [BADGE_TIERS.SPECIAL]: 'from-purple-400 to-purple-500',
-      [BADGE_TIERS.LEGEND]: 'from-yellow-400 to-orange-500'
+      [BADGE_TIERS.BEGINNER]: 'from-gray-200 to-gray-300',      // 밝은 회색
+      [BADGE_TIERS.SKILLED]: 'from-green-200 to-green-300',     // 파스텔 그린
+      [BADGE_TIERS.MASTER]: 'from-blue-200 to-blue-300',        // 파스텔 블루
+      [BADGE_TIERS.SPECIAL]: 'from-purple-200 to-purple-300',   // 파스텔 퍼플
+      [BADGE_TIERS.LEGEND]: 'from-yellow-200 to-amber-300'      // 파스텔 골드
     };
-    return tierColors[tier] || 'from-gray-400 to-gray-500';
+    return tierColors[tier] || 'from-gray-200 to-gray-300';
   };
 
   const getTierLabel = (tier) => {
@@ -299,11 +331,8 @@ export default function StudentView() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="text-center md:text-left">
               <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
-                🎓 {studentData.name}
+                🎓 {studentData.name} <span className="text-2xl text-gray-600">({studentData.className})</span>
               </h1>
-              <p className="text-lg text-gray-600">
-                {studentData.className}
-              </p>
             </div>
             <div className="flex gap-3">
               <button
@@ -311,7 +340,7 @@ export default function StudentView() {
                   console.log('🔄 수동 새로고침 시작');
                   loadStudentData();
                 }}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition shadow-lg hover:shadow-xl flex items-center gap-2"
+                className="bg-green-200 hover:bg-green-300 text-gray-800 px-6 py-3 rounded-lg font-bold transition shadow-lg hover:shadow-xl flex items-center gap-2 text-lg"
                 disabled={loading}
               >
                 {loading ? '🔄 갱신 중...' : '🔄 새로고침'}
@@ -320,7 +349,7 @@ export default function StudentView() {
                 onClick={() => {
                   logout();
                 }}
-                className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition shadow-lg hover:shadow-xl"
+                className="bg-blue-200 hover:bg-blue-300 text-gray-800 px-6 py-3 rounded-lg font-bold transition shadow-lg hover:shadow-xl text-lg"
               >
                 ← 선생님 페이지로 돌아가기
               </button>
@@ -335,42 +364,9 @@ export default function StudentView() {
           </div>
         )}
 
-        {/* 통계 카드 */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            📊 나의 통계
-          </h2>
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-xl text-center">
-              <div className="text-3xl font-bold text-blue-600">{stats?.total_games || 0}</div>
-              <div className="text-sm text-gray-600 mt-1 font-bold">경기 수</div>
-            </div>
-            <div className="bg-gradient-to-br from-green-50 to-green-100 p-3 rounded-xl text-center">
-              <div className="text-3xl font-bold text-green-600">{stats?.total_hits || 0}</div>
-              <div className="text-sm text-gray-600 mt-1 font-bold">안타</div>
-            </div>
-            <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-3 rounded-xl text-center">
-              <div className="text-3xl font-bold text-yellow-600">{stats?.total_runs || 0}</div>
-              <div className="text-sm text-gray-600 mt-1 font-bold">득점</div>
-            </div>
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-3 rounded-xl text-center">
-              <div className="text-3xl font-bold text-purple-600">{stats?.total_good_defense || 0}</div>
-              <div className="text-sm text-gray-600 mt-1 font-bold">수비</div>
-            </div>
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-3 rounded-xl text-center">
-              <div className="text-3xl font-bold text-orange-600">{stats?.total_bonus_cookie || 0}</div>
-              <div className="text-sm text-gray-600 mt-1 font-bold">쿠키</div>
-            </div>
-            <div className="bg-gradient-to-br from-teal-50 to-teal-100 p-3 rounded-xl text-center">
-              <div className="text-3xl font-bold text-teal-600">{badges.length}</div>
-              <div className="text-sm text-gray-600 mt-1 font-bold">배지 수</div>
-            </div>
-          </div>
-        </div>
-
         {/* 배지 컬렉션 */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <h2 className="text-3xl font-bold text-gray-800 mb-4 flex items-center gap-2">
             🏅 나의 배지
           </h2>
           {badges.length === 0 ? (
@@ -380,30 +376,56 @@ export default function StudentView() {
               <p className="text-sm mt-2">열심히 활동해서 배지를 모아보세요!</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {badges.map((badge, index) => (
-                <div
-                  key={index}
-                  className={`bg-gradient-to-br ${getTierColor(badge.badge?.tier)} p-4 rounded-xl shadow-lg hover:shadow-xl transition-all cursor-pointer`}
-                >
-                  <div className="text-center">
-                    <div className="text-5xl mb-2">{badge.badge?.icon || '🏅'}</div>
-                    <div className="text-white font-bold text-sm mb-1">
-                      {badge.badge?.name || '배지'}
-                    </div>
-                    <div className="text-white text-xs opacity-90 mb-2">
-                      {getTierLabel(badge.badge?.tier)}
+            <div className={`grid ${
+              badges.length === 1 ? 'grid-cols-1 max-w-xs mx-auto' :
+              badges.length === 2 ? 'grid-cols-2 max-w-2xl mx-auto' :
+              badges.length === 3 ? 'grid-cols-3 max-w-4xl mx-auto' :
+              badges.length === 4 ? 'grid-cols-4 max-w-5xl mx-auto' :
+              'grid-cols-5'
+            } gap-4`}>
+              {badges.map((badge, index) => {
+                const formatDate = (dateString) => {
+                  if (!dateString) return '날짜 미상';
+                  const date = new Date(dateString);
+                  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+                };
+
+                return (
+                  <div
+                    key={index}
+                    className={`bg-gradient-to-br ${getTierColor(badge.badge?.tier)} p-5 rounded-xl shadow-lg hover:shadow-xl transition-all cursor-pointer`}
+                  >
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-3 mb-2">
+                        <span className="text-5xl">{badge.badge?.icon || '🏅'}</span>
+                        <div className="text-left">
+                          <div className="text-gray-800 font-bold text-base">
+                            {badge.badge?.name || '배지'} <span className="text-gray-600 text-sm">({getTierLabel(badge.badge?.tier)})</span>
+                          </div>
+                          <div className="text-gray-500 text-sm mt-1">
+                            📅 {formatDate(badge.earned_at)}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
+        {/* 경기 기록 */}
+        <div className="mb-6">
+          <StudentGameHistory
+            playerId={studentData?.playerId}
+            teacherId={studentData?.teacherId}
+          />
+        </div>
+
         {/* 반 랭킹 */}
         <div className="bg-white rounded-2xl shadow-xl p-6">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <h2 className="text-3xl font-bold text-gray-800 mb-4 flex items-center gap-2">
             🏆 우리 반 랭킹
           </h2>
           {classRanking.length === 0 ? (
@@ -416,14 +438,14 @@ export default function StudentView() {
               <table className="w-full">
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="p-3 text-left">순위</th>
-                    <th className="p-3 text-left">이름</th>
-                    <th className="p-3 text-center">경기 수</th>
-                    <th className="p-3 text-center">안타</th>
-                    <th className="p-3 text-center">득점</th>
-                    <th className="p-3 text-center">수비</th>
-                    <th className="p-3 text-center">쿠키</th>
-                    <th className="p-3 text-center">총점</th>
+                    <th className="p-3 text-left text-base">순위</th>
+                    <th className="p-3 text-left text-base">이름</th>
+                    <th className="p-3 text-center text-base">경기 수</th>
+                    <th className="p-3 text-center text-base">안타</th>
+                    <th className="p-3 text-center text-base">득점</th>
+                    <th className="p-3 text-center text-base">수비</th>
+                    <th className="p-3 text-center text-base">쿠키</th>
+                    <th className="p-3 text-center text-base">총점</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -434,22 +456,22 @@ export default function StudentView() {
                         key={index}
                         className={`border-t ${isMe ? 'bg-blue-50 font-bold' : 'hover:bg-gray-50'}`}
                       >
-                        <td className="p-3">
+                        <td className="p-3 text-base">
                           {index === 0 && '🥇'}
                           {index === 1 && '🥈'}
                           {index === 2 && '🥉'}
                           {index > 2 && `${index + 1}위`}
                         </td>
-                        <td className="p-3">
+                        <td className="p-3 text-base">
                           {player.name || '알 수 없음'}
                           {isMe && ' (나)'}
                         </td>
-                        <td className="p-3 text-center">{player.total_games || 0}</td>
-                        <td className="p-3 text-center">{player.total_hits || 0}</td>
-                        <td className="p-3 text-center">{player.total_runs || 0}</td>
-                        <td className="p-3 text-center">{player.total_good_defense || 0}</td>
-                        <td className="p-3 text-center">{player.total_bonus_cookie || 0}</td>
-                        <td className="p-3 text-center">{player.total_points || 0}</td>
+                        <td className="p-3 text-center text-base">{player.total_games || 0}</td>
+                        <td className="p-3 text-center text-base">{player.total_hits || 0}</td>
+                        <td className="p-3 text-center text-base">{player.total_runs || 0}</td>
+                        <td className="p-3 text-center text-base">{player.total_good_defense || 0}</td>
+                        <td className="p-3 text-center text-base">{player.total_bonus_cookie || 0}</td>
+                        <td className="p-3 text-center text-base">{player.total_points || 0}</td>
                       </tr>
                     );
                   })}

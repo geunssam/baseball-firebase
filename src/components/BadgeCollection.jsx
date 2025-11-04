@@ -14,7 +14,7 @@ import firestoreService from '../services/firestoreService';
  *
  * 배지 도감 - 모든 배지를 등급별로 보여주고 획득 현황 표시
  */
-const BadgeCollection = ({ onBack }) => {
+const BadgeCollection = ({ onBack, customBadges = [], hiddenBadges = [] }) => {
   const { students, playerBadges } = useGame();
   const [selectedTier, setSelectedTier] = useState('ALL');
   const [playerStats, setPlayerStats] = useState({});
@@ -156,13 +156,16 @@ const BadgeCollection = ({ onBack }) => {
     }
   };
 
-  // 배지 목록 필터링
+  // 배지 목록 필터링 (시스템 + 커스텀, 숨긴 배지 제외)
   const getFilteredBadges = () => {
-    const badgeList = Object.values(BADGES);
+    const allBadges = [...Object.values(BADGES), ...customBadges].filter(b => !hiddenBadges.includes(b.id));
     if (selectedTier === 'ALL') {
-      return badgeList;
+      return allBadges;
     }
-    return badgeList.filter(badge => badge.tier === parseInt(selectedTier));
+    if (selectedTier === 'CUSTOM') {
+      return customBadges.filter(b => !hiddenBadges.includes(b.id));
+    }
+    return allBadges.filter(badge => badge.tier === parseInt(selectedTier));
   };
 
   // 배지 카드 렌더링 (교사용 - 모두 컬러 표시)
@@ -234,8 +237,8 @@ const BadgeCollection = ({ onBack }) => {
 
   const filteredBadges = getFilteredBadges();
 
-  // 통계 계산
-  const totalBadges = Object.keys(BADGES).length;
+  // 통계 계산 (시스템 + 커스텀)
+  const totalBadges = Object.keys(BADGES).length + customBadges.length;
   const uniqueAcquiredBadges = new Set();
   Object.values(playerStats).forEach(stat => {
     stat.badges.forEach(badgeId => uniqueAcquiredBadges.add(badgeId));
@@ -283,19 +286,20 @@ const BadgeCollection = ({ onBack }) => {
 
       {/* 필터 탭 */}
       <Tabs value={selectedTier} onValueChange={setSelectedTier} className="flex-1 w-full max-w-full flex flex-col min-h-0 overflow-hidden">
-        <TabsList className="w-full grid grid-cols-6 rounded-none border-b flex-shrink-0">
+        <TabsList className="w-full grid grid-cols-7 rounded-none border-b flex-shrink-0">
           <TabsTrigger value="ALL">전체</TabsTrigger>
           <TabsTrigger value={String(BADGE_TIERS.BEGINNER)}>입문</TabsTrigger>
           <TabsTrigger value={String(BADGE_TIERS.SKILLED)}>숙련</TabsTrigger>
           <TabsTrigger value={String(BADGE_TIERS.MASTER)}>마스터</TabsTrigger>
           <TabsTrigger value={String(BADGE_TIERS.LEGEND)}>레전드</TabsTrigger>
           <TabsTrigger value={String(BADGE_TIERS.SPECIAL)}>특별</TabsTrigger>
+          <TabsTrigger value="CUSTOM">✨ 커스텀</TabsTrigger>
         </TabsList>
 
         {/* 전체 탭 */}
         <TabsContent value="ALL" className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
           <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {Object.values(BADGES).map(badge => (
+            {[...Object.values(BADGES), ...customBadges].filter(b => !hiddenBadges.includes(b.id)).map(badge => (
               <BadgeCard key={badge.id} badge={badge} />
             ))}
           </div>
@@ -304,7 +308,7 @@ const BadgeCollection = ({ onBack }) => {
         {/* 입문 탭 */}
         <TabsContent value={String(BADGE_TIERS.BEGINNER)} className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
           <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {Object.values(BADGES).filter(b => b.tier === BADGE_TIERS.BEGINNER).map(badge => (
+            {[...Object.values(BADGES), ...customBadges].filter(b => b.tier === BADGE_TIERS.BEGINNER && !hiddenBadges.includes(b.id)).map(badge => (
               <BadgeCard key={badge.id} badge={badge} />
             ))}
           </div>
@@ -313,7 +317,7 @@ const BadgeCollection = ({ onBack }) => {
         {/* 숙련 탭 */}
         <TabsContent value={String(BADGE_TIERS.SKILLED)} className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
           <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {Object.values(BADGES).filter(b => b.tier === BADGE_TIERS.SKILLED).map(badge => (
+            {[...Object.values(BADGES), ...customBadges].filter(b => b.tier === BADGE_TIERS.SKILLED && !hiddenBadges.includes(b.id)).map(badge => (
               <BadgeCard key={badge.id} badge={badge} />
             ))}
           </div>
@@ -322,7 +326,7 @@ const BadgeCollection = ({ onBack }) => {
         {/* 마스터 탭 */}
         <TabsContent value={String(BADGE_TIERS.MASTER)} className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
           <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {Object.values(BADGES).filter(b => b.tier === BADGE_TIERS.MASTER).map(badge => (
+            {[...Object.values(BADGES), ...customBadges].filter(b => b.tier === BADGE_TIERS.MASTER && !hiddenBadges.includes(b.id)).map(badge => (
               <BadgeCard key={badge.id} badge={badge} />
             ))}
           </div>
@@ -331,7 +335,7 @@ const BadgeCollection = ({ onBack }) => {
         {/* 레전드 탭 */}
         <TabsContent value={String(BADGE_TIERS.LEGEND)} className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
           <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {Object.values(BADGES).filter(b => b.tier === BADGE_TIERS.LEGEND).map(badge => (
+            {[...Object.values(BADGES), ...customBadges].filter(b => b.tier === BADGE_TIERS.LEGEND && !hiddenBadges.includes(b.id)).map(badge => (
               <BadgeCard key={badge.id} badge={badge} />
             ))}
           </div>
@@ -340,10 +344,27 @@ const BadgeCollection = ({ onBack }) => {
         {/* 특별 탭 */}
         <TabsContent value={String(BADGE_TIERS.SPECIAL)} className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
           <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {Object.values(BADGES).filter(b => b.tier === BADGE_TIERS.SPECIAL).map(badge => (
+            {[...Object.values(BADGES), ...customBadges].filter(b => b.tier === BADGE_TIERS.SPECIAL && !hiddenBadges.includes(b.id)).map(badge => (
               <BadgeCard key={badge.id} badge={badge} />
             ))}
           </div>
+        </TabsContent>
+
+        {/* 커스텀 탭 */}
+        <TabsContent value="CUSTOM" className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
+          {customBadges.filter(b => !hiddenBadges.includes(b.id)).length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <p className="text-5xl mb-4">📦</p>
+              <p className="text-lg font-semibold mb-2">아직 만든 배지가 없습니다</p>
+              <p className="text-sm">배지 관리에서 커스텀 배지를 만들어보세요!</p>
+            </div>
+          ) : (
+            <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              {customBadges.filter(b => !hiddenBadges.includes(b.id)).map(badge => (
+                <BadgeCard key={badge.id} badge={badge} />
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 

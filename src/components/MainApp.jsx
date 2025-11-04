@@ -16,7 +16,13 @@ import ClassTeamManagementView from './ClassTeamManagementView';
 import BadgeCollection from './BadgeCollection';
 import StatsView from './StatsView';
 import StudentCodeListModal from './StudentCodeListModal';
+import BadgeManagementModal from './BadgeManagementModal';
+import ManualBadgeModal from './ManualBadgeModal';
+import ClassRankingWidget from './ClassRankingWidget';
+import ClassDetailRankingModal from './ClassDetailRankingModal';
 import { useModalKeyboard } from '../hooks/useKeyboardShortcut';
+import { BADGES } from '../utils/badgeSystem';
+import { saveCustomBadge, loadCustomBadges, deleteCustomBadge, awardManualBadge, recalculateAllStudentBadges } from '../services/firestoreService';
 
 const MainApp = () => {
   const { user, signOut } = useAuth();
@@ -50,6 +56,22 @@ const MainApp = () => {
   const [showGameRecordModal, setShowGameRecordModal] = useState(false);
   const [selectedRecordGameId, setSelectedRecordGameId] = useState(null);
 
+  // 커스텀 배지 관련 상태
+  const [customBadges, setCustomBadges] = useState([]);
+  const [badgeOverrides, setBadgeOverrides] = useState({});
+  const [hiddenBadges, setHiddenBadges] = useState([]);
+  const [showBadgeManagement, setShowBadgeManagement] = useState(false);
+  const [showManualBadgeModal, setShowManualBadgeModal] = useState(false);
+  const [selectedStudentForBadge, setSelectedStudentForBadge] = useState(null);
+
+  // 배지 재계산 상태
+  const [isRecalculating, setIsRecalculating] = useState(false);
+  const [recalculateProgress, setRecalculateProgress] = useState(null);
+
+  // 학급 랭킹 관련 상태
+  const [showClassDetailModal, setShowClassDetailModal] = useState(false);
+  const [selectedClassData, setSelectedClassData] = useState(null);
+
   // 현재 날짜/시간 업데이트
   useEffect(() => {
     const timer = setInterval(() => {
@@ -70,6 +92,53 @@ const MainApp = () => {
       });
     }
   }, [teams.length, games.length, finishedGames.length, loading, user?.email]);
+
+  // 커스텀 배지 초기 로드
+  useEffect(() => {
+    if (user) {
+      // 로컬스토리지에서 로드
+      const savedBadges = localStorage.getItem('customBadges');
+      if (savedBadges) {
+        try {
+          setCustomBadges(JSON.parse(savedBadges));
+        } catch (error) {
+          console.error('커스텀 배지 로드 실패:', error);
+        }
+      }
+
+      const savedOverrides = localStorage.getItem('badgeOverrides');
+      if (savedOverrides) {
+        try {
+          setBadgeOverrides(JSON.parse(savedOverrides));
+        } catch (error) {
+          console.error('배지 오버라이드 로드 실패:', error);
+        }
+      }
+
+      const savedHidden = localStorage.getItem('hiddenBadges');
+      if (savedHidden) {
+        try {
+          setHiddenBadges(JSON.parse(savedHidden));
+        } catch (error) {
+          console.error('숨긴 배지 로드 실패:', error);
+        }
+      }
+
+      // Firebase에서 동기화 (선택)
+      const syncFromFirebase = async () => {
+        try {
+          const firebaseBadges = await loadCustomBadges(user.uid);
+          if (firebaseBadges.length > 0) {
+            setCustomBadges(firebaseBadges);
+            localStorage.setItem('customBadges', JSON.stringify(firebaseBadges));
+          }
+        } catch (error) {
+          console.error('Firebase 동기화 실패:', error);
+        }
+      };
+      syncFromFirebase();
+    }
+  }, [user]);
 
   // 경기 목록 필터링
   const playingGames = games.filter(g => g.status === 'playing');
@@ -93,6 +162,109 @@ const MainApp = () => {
       setShowCreateModal(false);
     } catch (error) {
       alert('❌ 팀 생성에 실패했습니다: ' + error.message);
+    }
+  };
+
+  // 배지 저장 핸들러
+  const handleSaveBadge = async (badge) => {
+    const isBasicBadge = badge.id && !badge.isCustom;
+
+    if (isBasicBadge) {
+      // 기본 배지 오버라이드 (아이콘/이름만)
+      const newOverrides = {
+        ...badgeOverrides,
+        [badge.id]: { icon: badge.icon, name: badge.name }
+      };
+      setBadgeOverrides(newOverrides);
+      localStorage.setItem('badgeOverrides', JSON.stringify(newOverrides));
+      alert('✅ 배지가 수정되었습니다!');
+    } else {
+      // 커스텀 배지 저장
+      const existingIndex = customBadges.findIndex(b => b.id === badge.id);
+      let newBadges;
+
+      if (existingIndex !== -1) {
+        // 수정
+        newBadges = customBadges.map(b => b.id === badge.id ? badge : b);
+      } else {
+        // 새로 추가
+        newBadges = [...customBadges, badge];
+      }
+
+      setCustomBadges(newBadges);
+      localStorage.setItem('customBadges', JSON.stringify(newBadges));
+
+      // Firebase 저장 (선택)
+      try {
+        await saveCustomBadge(user.uid, badge);
+        alert('✅ 커스텀 배지가 저장되었습니다!');
+      } catch (error) {
+        console.error('Firebase 저장 실패:', error);
+        alert('⚠️ 배지 저장 중 오류가 발생했습니다.');
+      }
+    }
+  };
+
+  // 배지 삭제 핸들러
+  const handleDeleteBadge = async (badgeId) => {
+    const newBadges = customBadges.filter(b => b.id !== badgeId);
+    setCustomBadges(newBadges);
+    localStorage.setItem('customBadges', JSON.stringify(newBadges));
+
+    // Firebase 삭제 (선택)
+    try {
+      await deleteCustomBadge(user.uid, badgeId);
+      alert('✅ 배지가 삭제되었습니다.');
+    } catch (error) {
+      console.error('Firebase 삭제 실패:', error);
+    }
+  };
+
+  // 배지 숨기기/표시 핸들러
+  const handleHideBadge = (badgeId) => {
+    const newHiddenBadges = hiddenBadges.includes(badgeId)
+      ? hiddenBadges.filter(id => id !== badgeId)
+      : [...hiddenBadges, badgeId];
+
+    setHiddenBadges(newHiddenBadges);
+    localStorage.setItem('hiddenBadges', JSON.stringify(newHiddenBadges));
+  };
+
+  // 배지 수동 부여 핸들러
+  const handleAwardBadge = async (playerId, badgeId, note) => {
+    try {
+      await awardManualBadge(user.uid, playerId, badgeId, note);
+      alert('✅ 배지를 부여했습니다!');
+    } catch (error) {
+      console.error('배지 부여 실패:', error);
+      alert('❌ 배지 부여에 실패했습니다: ' + error.message);
+    }
+  };
+
+  // 모든 학생 배지 재계산 핸들러
+  const handleRecalculateAllBadges = async () => {
+    if (!confirm('모든 학생의 배지를 재계산하시겠습니까?\n\n이 작업은 시간이 걸릴 수 있습니다.')) {
+      return;
+    }
+
+    setIsRecalculating(true);
+    setRecalculateProgress({ current: 0, total: 0, studentName: '' });
+
+    try {
+      const result = await recalculateAllStudentBadges(
+        user.uid,
+        (progress) => {
+          setRecalculateProgress(progress);
+        }
+      );
+
+      alert(`✅ 배지 재계산 완료!\n\n성공: ${result.success}명\n실패: ${result.failed}명\n총: ${result.total}명`);
+      setRecalculateProgress(null);
+    } catch (error) {
+      console.error('배지 재계산 실패:', error);
+      alert('❌ 배지 재계산에 실패했습니다: ' + error.message);
+    } finally {
+      setIsRecalculating(false);
     }
   };
 
@@ -357,6 +529,20 @@ const MainApp = () => {
               >
                 📋 학생코드
               </Button>
+              <Button
+                onClick={() => setShowBadgeManagement(true)}
+                size="sm"
+                className="bg-purple-100 hover:bg-purple-200 text-purple-700 border-purple-200 text-sm tablet:text-base tablet-lg:text-lg"
+              >
+                ⚙️ 배지 관리
+              </Button>
+              <Button
+                onClick={() => setDashboardView('classRanking')}
+                size="sm"
+                className="bg-yellow-100 hover:bg-yellow-200 text-yellow-700 border-yellow-200 text-sm tablet:text-base tablet-lg:text-lg"
+              >
+                🏆 학급 랭킹
+              </Button>
               <Button onClick={signOut} size="sm" className="bg-red-100 hover:bg-red-200 text-red-700 border-red-200 text-sm tablet:text-base tablet-lg:text-lg">
                 로그아웃
               </Button>
@@ -375,6 +561,7 @@ const MainApp = () => {
             </CardContent>
           </Card>
         )}
+
 
         {/* 대시보드 뷰 */}
         {dashboardView === 'dashboard' && (
@@ -839,6 +1026,33 @@ const MainApp = () => {
           <div className="w-full h-[calc(100vh-4rem-3.5rem)]">
             <BadgeCollection
               onBack={() => setDashboardView('dashboard')}
+              customBadges={customBadges}
+              hiddenBadges={hiddenBadges}
+            />
+          </div>
+        )}
+
+        {/* 학급 랭킹 뷰 */}
+        {dashboardView === 'classRanking' && (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <button
+                onClick={() => setDashboardView('dashboard')}
+                className="flex items-center gap-2 px-4 py-2 bg-sky-100 hover:bg-sky-200 text-sky-700 font-medium rounded-full transition-all duration-200 shadow-sm hover:shadow-md"
+              >
+                <span>←</span>
+                <span>대시보드</span>
+              </button>
+              <h2 className="text-2xl font-bold text-foreground">🏆 학급별 랭킹</h2>
+              <div className="w-24"></div>
+            </div>
+
+            <ClassRankingWidget
+              teacherId={user?.uid}
+              onClassClick={(classData) => {
+                setSelectedClassData(classData);
+                setShowClassDetailModal(true);
+              }}
             />
           </div>
         )}
@@ -910,6 +1124,39 @@ const MainApp = () => {
         <StudentCodeListModal
           open={showStudentCodeModal}
           onOpenChange={setShowStudentCodeModal}
+        />
+
+        {/* 배지 관리 모달 */}
+        <BadgeManagementModal
+          open={showBadgeManagement}
+          onOpenChange={setShowBadgeManagement}
+          customBadges={customBadges}
+          systemBadges={Object.values(BADGES)}
+          onSaveBadge={handleSaveBadge}
+          onDeleteBadge={handleDeleteBadge}
+          onHideBadge={handleHideBadge}
+          hiddenBadges={hiddenBadges}
+          onRecalculateAllBadges={handleRecalculateAllBadges}
+          isRecalculating={isRecalculating}
+          recalculateProgress={recalculateProgress}
+        />
+
+        {/* 수동 배지 부여 모달 */}
+        <ManualBadgeModal
+          open={showManualBadgeModal}
+          onOpenChange={setShowManualBadgeModal}
+          student={selectedStudentForBadge}
+          allBadges={[...Object.values(BADGES), ...customBadges].filter(b => !hiddenBadges.includes(b.id))}
+          ownedBadges={playerBadges[selectedStudentForBadge?.playerId] || []}
+          onAwardBadge={handleAwardBadge}
+        />
+
+        {/* 학급 상세 랭킹 모달 */}
+        <ClassDetailRankingModal
+          open={showClassDetailModal}
+          onOpenChange={setShowClassDetailModal}
+          classData={selectedClassData}
+          teacherId={user?.uid}
         />
 
         {/* 경기 기록 모달 */}

@@ -87,6 +87,12 @@ service cloud.firestore {
       match /settings/{document=**} {
         allow read, write: if isOwner(userId);
       }
+
+      // 커스텀 배지 (Phase 1)
+      match /customBadges/{badgeId} {
+        allow read: if isSignedIn();  // 모든 로그인 유저가 볼 수 있음
+        allow write: if isOwner(userId);  // 본인만 수정
+      }
     }
 
     // ============================================

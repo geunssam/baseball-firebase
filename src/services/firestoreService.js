@@ -1070,26 +1070,76 @@ class FirestoreService {
       const historyData = historyDoc.data();
       const games = historyData.games || [];
 
-      // 누적 통계 계산
-      const totalStats = calculatePlayerTotalStats(games, 0); // mvpCount는 별도 관리
+      if (games.length === 0) {
+        console.log(`⚠️ ${playerId} 경기 기록 없음`);
+        const badgeRef = this.getUserDoc('playerBadges', playerId);
+        await setDoc(badgeRef, {
+          playerId,
+          badges: [],
+          updatedAt: serverTimestamp()
+        });
+        return;
+      }
 
-      // 획득한 배지 계산
-      const earnedBadges = [];
-      for (const badge of Object.values(BADGES)) {
-        if (badge.condition && badge.condition(totalStats)) {
-          earnedBadges.push(badge.id);
+      // 🔹 경기를 날짜순으로 정렬 (오래된 순서부터)
+      const sortedGames = [...games].sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateA - dateB;
+      });
+
+      let previousBadges = []; // 이전까지 획득한 배지 목록
+      const updatedGames = []; // newBadges가 추가된 경기 목록
+
+      // 🔹 각 경기마다 순회하면서 새로 획득한 배지 찾기
+      for (let i = 0; i < sortedGames.length; i++) {
+        const currentGame = sortedGames[i];
+
+        // 해당 경기까지의 누적 통계 계산
+        const gamesUpToNow = sortedGames.slice(0, i + 1);
+        const cumulativeStats = calculatePlayerTotalStats(gamesUpToNow, 0);
+
+        // 현재까지 획득한 배지 계산
+        const currentBadges = [];
+        for (const badge of Object.values(BADGES)) {
+          if (badge.condition && badge.condition(cumulativeStats)) {
+            currentBadges.push(badge.id);
+          }
+        }
+
+        // 새로 획득한 배지 찾기 (이전 배지 목록과 비교)
+        const newBadges = currentBadges.filter(badgeId => !previousBadges.includes(badgeId));
+
+        // 경기 데이터에 newBadges 추가
+        updatedGames.push({
+          ...currentGame,
+          newBadges: newBadges
+        });
+
+        // 다음 경기를 위해 이전 배지 목록 업데이트
+        previousBadges = [...currentBadges];
+
+        if (newBadges.length > 0) {
+          console.log(`🎖️ ${playerId} - 경기 ${currentGame.gameId} (${currentGame.date}): 새 배지 ${newBadges.length}개 획득`);
         }
       }
 
-      // playerBadges 컬렉션에 저장
-      const badgeRef = this.getUserDoc('playerBadges', playerId);
-      await setDoc(badgeRef, {
-        playerId,
-        badges: earnedBadges,
+      // 🔹 playerHistory 업데이트 (newBadges 포함)
+      await setDoc(historyRef, {
+        ...historyData,
+        games: updatedGames,
         updatedAt: serverTimestamp()
       });
 
-      console.log(`✅ ${playerId} 배지 업데이트 완료: ${earnedBadges.length}개`);
+      // 🔹 playerBadges 컬렉션에 최종 배지 목록 저장
+      const badgeRef = this.getUserDoc('playerBadges', playerId);
+      await setDoc(badgeRef, {
+        playerId,
+        badges: previousBadges, // 최종 배지 목록
+        updatedAt: serverTimestamp()
+      });
+
+      console.log(`✅ ${playerId} 배지 업데이트 완료: ${previousBadges.length}개 (경기별 newBadges 기록 포함)`);
     } catch (error) {
       console.error(`❌ ${playerId} 배지 업데이트 실패:`, error);
       throw error;
@@ -1230,3 +1280,366 @@ class FirestoreService {
 const firestoreService = new FirestoreService();
 
 export default firestoreService;
+
+// ========================================
+// 커스텀 배지 관련 함수들 (Phase 1)
+// ========================================
+
+/**
+ * 커스텀 배지 저장
+ * @param {string} teacherId - 교사 UID
+ * @param {Object} badge - 배지 객체
+ * @returns {Promise<Object>} 저장 결과
+ */
+export async function saveCustomBadge(teacherId, badge) {
+  try {
+    const badgeRef = doc(db, 'users', teacherId, 'customBadges', badge.id);
+
+    const badgeData = {
+      id: badge.id,
+      name: badge.name,
+      icon: badge.icon,
+      tier: badge.tier || 1,
+      badgeType: 'custom',
+      conditionType: badge.conditionType || 'manual',
+      conditionData: badge.conditionData || null,
+      description: badge.description || '',
+      isActive: true,
+      displayOrder: 0,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+
+    await setDoc(badgeRef, badgeData, { merge: true });
+    return { success: true, data: badgeData };
+  } catch (error) {
+    console.error('커스텀 배지 저장 실패:', error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * 커스텀 배지 목록 불러오기
+ * @param {string} teacherId - 교사 UID
+ * @returns {Promise<Array>} 커스텀 배지 목록
+ */
+export async function loadCustomBadges(teacherId) {
+  try {
+    const badgesRef = collection(db, 'users', teacherId, 'customBadges');
+    const q = query(badgesRef, where('isActive', '==', true));
+    const snapshot = await getDocs(q);
+
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('커스텀 배지 불러오기 실패:', error);
+    return [];
+  }
+}
+
+/**
+ * 커스텀 배지 삭제
+ * @param {string} teacherId - 교사 UID
+ * @param {string} badgeId - 배지 ID
+ * @returns {Promise<Object>} 삭제 결과
+ */
+export async function deleteCustomBadge(teacherId, badgeId) {
+  try {
+    const badgeRef = doc(db, 'users', teacherId, 'customBadges', badgeId);
+    await deleteDoc(badgeRef);
+    return { success: true };
+  } catch (error) {
+    console.error('커스텀 배지 삭제 실패:', error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * 수동 배지 부여
+ * @param {string} teacherId - 교사 UID
+ * @param {string} playerId - 학생 ID
+ * @param {string} badgeId - 배지 ID
+ * @param {string} note - 수여 사유
+ * @returns {Promise<Object>} 부여 결과
+ */
+export async function awardManualBadge(teacherId, playerId, badgeId, note = '') {
+  try {
+    const badgeRef = doc(db, 'users', teacherId, 'playerBadges', playerId);
+
+    // 기존 배지 목록 가져오기
+    const badgeDoc = await getDoc(badgeRef);
+    const currentBadges = badgeDoc.exists() ? badgeDoc.data().badges || [] : [];
+
+    // 중복 체크
+    if (currentBadges.includes(badgeId)) {
+      return { success: false, error: '이미 보유한 배지입니다' };
+    }
+
+    // 배지 추가
+    await setDoc(badgeRef, {
+      badges: [...currentBadges, badgeId],
+      lastAwarded: {
+        badgeId,
+        awardedAt: serverTimestamp(),
+        awardedBy: teacherId,
+        awardType: 'manual',
+        note
+      }
+    }, { merge: true });
+
+    return { success: true };
+  } catch (error) {
+    console.error('수동 배지 부여 실패:', error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * 학생의 전체 경기 기록 (상세 정보 포함)
+ * @param {string} teacherId - 교사 UID
+ * @param {string} playerId - 학생 ID
+ * @returns {Promise<Array>} 경기 기록 배열
+ */
+export async function getPlayerDetailedHistory(teacherId, playerId) {
+  try {
+    console.log('🔍 [getPlayerDetailedHistory] 시작');
+    console.log('  - teacherId:', teacherId);
+    console.log('  - playerId:', playerId);
+
+    // 1. playerHistory에서 games 배열 가져오기
+    const historyRef = doc(db, 'users', teacherId, 'playerHistory', playerId);
+    console.log('  - historyRef 경로:', `users/${teacherId}/playerHistory/${playerId}`);
+
+    const historyDoc = await getDoc(historyRef);
+    console.log('  - historyDoc.exists():', historyDoc.exists());
+
+    if (!historyDoc.exists()) {
+      console.log(`⚠️ ${playerId} playerHistory 문서가 존재하지 않음`);
+      return [];
+    }
+
+    const historyData = historyDoc.data();
+    console.log('  - historyData:', historyData);
+
+    const games = historyData.games || [];
+    console.log('  - games 배열 길이:', games.length);
+
+    if (games.length === 0) {
+      console.log('⚠️ games 배열이 비어있음');
+      return [];
+    }
+
+    console.log('  - 첫 번째 게임:', games[0]);
+
+    // 2. 각 gameId로 finishedGames 조회
+    const detailedGames = await Promise.all(
+      games.map(async (game) => {
+        try {
+          const gameRef = doc(db, 'users', teacherId, 'finishedGames', game.gameId);
+          const gameDoc = await getDoc(gameRef);
+
+          if (!gameDoc.exists()) {
+            console.warn(`⚠️ 경기 ${game.gameId} 데이터 없음`);
+            return null;
+          }
+
+          const gameData = gameDoc.data();
+
+          // 3. 해당 플레이어의 팀과 스탯 찾기
+          // teamA와 teamB 모두에서 찾아봄 (lineup 또는 players 필드)
+          const teamAPlayers = gameData.teamA?.lineup || gameData.teamA?.players || [];
+          const teamBPlayers = gameData.teamB?.lineup || gameData.teamB?.players || [];
+
+          const playerInTeamA = teamAPlayers.find(p =>
+            (p.playerId || p.id) === playerId
+          );
+          const playerInTeamB = teamBPlayers.find(p =>
+            (p.playerId || p.id) === playerId
+          );
+
+          const playerData = playerInTeamA || playerInTeamB;
+          const playerTeam = playerInTeamA ? gameData.teamA.name : gameData.teamB.name;
+
+          // 4. 승패 계산
+          const isTeamA = !!playerInTeamA;
+          const teamScore = isTeamA
+            ? gameData.scoreBoard?.teamATotal || 0
+            : gameData.scoreBoard?.teamBTotal || 0;
+          const opponentScore = isTeamA
+            ? gameData.scoreBoard?.teamBTotal || 0
+            : gameData.scoreBoard?.teamATotal || 0;
+          const result = teamScore > opponentScore ? 'win' : 'lose';
+
+          return {
+            gameId: game.gameId,
+            date: game.date,
+            team: playerTeam,
+            score: {
+              our: teamScore,
+              opponent: opponentScore
+            },
+            result,
+            stats: playerData?.stats || game.stats || {
+              hits: 0,
+              runs: 0,
+              goodDefense: 0,
+              bonusCookie: 0
+            },
+            newBadges: game.newBadges || [], // playerHistory에 저장된 newBadges 사용
+            // 추가 정보 (나중에 필요하면 사용)
+            inningDetails: [],
+            highlights: []
+          };
+        } catch (err) {
+          console.error(`❌ 경기 ${game.gameId} 처리 실패:`, err);
+          return null;
+        }
+      })
+    );
+
+    // null 제거 및 최신순 정렬
+    const validGames = detailedGames.filter(g => g !== null);
+    validGames.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    console.log(`✅ ${playerId} 상세 경기 기록 ${validGames.length}개 로드 완료`);
+    return validGames;
+  } catch (error) {
+    console.error('❌ getPlayerDetailedHistory 실패:', error);
+    return [];
+  }
+}
+
+/**
+ * 모든 학생의 배지 재계산
+ * @param {string} teacherId - 선생님 ID
+ * @param {Function} onProgress - 진행 상황 콜백 (선택)
+ * @returns {Promise<{success: number, failed: number, total: number}>}
+ */
+export async function recalculateAllStudentBadges(teacherId, onProgress) {
+  try {
+    console.log('🔄 모든 학생 배지 재계산 시작...');
+
+    // 1. 모든 학생 조회
+    const studentsRef = collection(db, 'users', teacherId, 'students');
+    const studentsSnapshot = await getDocs(studentsRef);
+
+    const students = studentsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    console.log(`📊 총 ${students.length}명의 학생 발견`);
+
+    if (students.length === 0) {
+      console.log('⚠️ 재계산할 학생이 없습니다.');
+      return { success: 0, failed: 0, total: 0 };
+    }
+
+    // 2. FirestoreService 인스턴스 생성
+    const firestoreService = new FirestoreService();
+
+    // 3. 각 학생의 배지 재계산
+    let successCount = 0;
+    let failedCount = 0;
+
+    for (let i = 0; i < students.length; i++) {
+      const student = students[i];
+      const playerId = student.playerId || student.id;
+
+      try {
+        console.log(`🔄 [${i + 1}/${students.length}] ${student.name} (${playerId}) 배지 재계산 중...`);
+
+        await firestoreService.updatePlayerBadgesFromHistory(playerId);
+
+        successCount++;
+        console.log(`✅ [${i + 1}/${students.length}] ${student.name} 완료`);
+
+        // 진행 상황 콜백 호출
+        if (onProgress) {
+          onProgress({
+            current: i + 1,
+            total: students.length,
+            studentName: student.name,
+            success: successCount,
+            failed: failedCount
+          });
+        }
+      } catch (error) {
+        failedCount++;
+        console.error(`❌ [${i + 1}/${students.length}] ${student.name} 실패:`, error);
+      }
+
+      // 너무 빠르게 실행되지 않도록 짧은 딜레이 (Firestore 부하 방지)
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    console.log(`\n✅ 배지 재계산 완료!`);
+    console.log(`   - 성공: ${successCount}명`);
+    console.log(`   - 실패: ${failedCount}명`);
+    console.log(`   - 총: ${students.length}명`);
+
+    return {
+      success: successCount,
+      failed: failedCount,
+      total: students.length
+    };
+  } catch (error) {
+    console.error('❌ 배지 재계산 중 오류 발생:', error);
+    throw error;
+  }
+}
+
+/**
+ * 학급별 랭킹 가져오기
+ * @param {string} teacherId - 교사 ID
+ * @returns {Promise<Array>} 학급별 랭킹 데이터
+ */
+export async function getClassRankings(teacherId) {
+  try {
+    console.log('🏆 [getClassRankings] 학급별 랭킹 계산 시작');
+
+    // 모든 학급 가져오기
+    const classesRef = collection(db, 'users', teacherId, 'classes');
+    const classesSnapshot = await getDocs(classesRef);
+
+    const classRankings = [];
+
+    for (const classDoc of classesSnapshot.docs) {
+      const classData = classDoc.data();
+      const className = classData.name;
+
+      // 해당 학급의 모든 학생 가져오기
+      const studentsRef = collection(db, 'users', teacherId, 'students');
+      const q = query(studentsRef, where('className', '==', className));
+      const studentsSnapshot = await getDocs(q);
+
+      let totalPoints = 0;
+      const studentCount = studentsSnapshot.size;
+
+      // 각 학생의 포인트 합산
+      for (const studentDoc of studentsSnapshot.docs) {
+        const studentData = studentDoc.data();
+        totalPoints += studentData.totalPoints || 0;
+      }
+
+      classRankings.push({
+        className,
+        totalPoints,
+        studentCount,
+        avgPoints: studentCount > 0 ? Math.round(totalPoints / studentCount) : 0
+      });
+    }
+
+    // 총점 기준으로 내림차순 정렬
+    classRankings.sort((a, b) => b.totalPoints - a.totalPoints);
+
+    console.log('✅ [getClassRankings] 학급별 랭킹:', classRankings);
+    return classRankings;
+
+  } catch (error) {
+    console.error('❌ [getClassRankings] 학급별 랭킹 계산 실패:', error);
+    throw error;
+  }
+}

@@ -21,9 +21,19 @@ import BadgeProgressIndicator from './BadgeProgressIndicator';
 import InningLineupChangeModal from './InningLineupChangeModal';
 import PlayerBadgeOrderModal from './PlayerBadgeOrderModal';
 import StudentCodeListModal from './StudentCodeListModal';
+import GameEndModal from './GameEndModal';
 import { checkNewBadges, calculatePlayerTotalStats, BADGES } from '../utils/badgeSystem';
 import { getNextBadgesProgress } from '../utils/badgeProgress';
-import { debugLog } from '../types/gameTypes';
+import {
+  debugLog,
+  getPlayerId,
+  normalizePlayerStats,
+  APPEARANCE_BADGES,
+  findEligibleAppearanceBadge,
+  checkAllPlayersForAppearanceBadges
+} from '../types/gameTypes';
+import { findEligibleBadges } from '../utils/autoBadgeChecker';
+import { loadCustomBadges } from '../services/firestoreService';
 
 /**
  * SortableAttackRow 컴포넌트
@@ -169,6 +179,10 @@ const GameScreen = ({ gameId, onExit }) => {
   const [showBadgePopup, setShowBadgePopup] = useState(false); // 배지 획득 팝업 표시 여부
   const badgePopupTimerRef = useRef(null); // 배지 팝업 자동 닫기 타이머
   const hasShownInitialBadgesRef = useRef(false); // 초기 배지 팝업 표시 여부 (중복 방지)
+
+  // GameEndModal 상태
+  const [showGameEndModal, setShowGameEndModal] = useState(false);
+  const [gameEndData, setGameEndData] = useState(null);
 
   // 선수 교체 상태
   const [replacingPlayerIndex, setReplacingPlayerIndex] = useState(null); // 교체 중인 선수 인덱스 (공격팀/수비팀 구분 필요)
@@ -338,44 +352,90 @@ const GameScreen = ({ gameId, onExit }) => {
             // 3. 새로 획득한 배지 찾기
             const allNewBadges = [];
 
-            // ✅ 새 경기인 경우: 출전 관련 모든 배지 체크 (첫 출전, 10경기, 30경기, 50경기, 100경기)
+            // ✅ 새 경기인 경우: 출전 관련 모든 배지 체크 (첫 출전, 5경기, 10경기, 30경기, 50경기, 100경기)
             if (currentGame.isNewGame && !hasShownInitialBadgesRef.current) {
               console.log('🆕 새 경기 감지! 출전 관련 배지 체크 시작...');
+
+              // 🔥 커스텀 배지 한 번만 로드 (최적화)
+              let customBadges = [];
+              try {
+                customBadges = await loadCustomBadges(user.uid);
+                console.log(`📋 커스텀 배지 ${customBadges.length}개 로드됨`);
+              } catch (error) {
+                console.error('❌ 커스텀 배지 로드 실패:', error);
+              }
+
+              const appearanceBadges = customBadges.filter(
+                badge => badge.conditionType === 'auto_appearances' && badge.conditionData
+              );
 
               // 양팀 선수 모두 체크
               const allPlayers = [...refreshedTeamA.lineup, ...refreshedTeamB.lineup];
 
               for (const player of allPlayers) {
-                const playerId = player.id || player.playerId;
+                // ✅ getPlayerId 사용 (데이터 정규화)
+                const playerId = getPlayerId(player);
                 if (!playerId) continue;
 
                 const history = playerHistory[playerId] || [];
 
-                // 현재 경기를 포함한 총 경기 수 (isNewGame이므로 현재 경기는 이미 포함됨)
+                // 현재 경기를 포함한 총 경기 수
                 const totalGames = history.length;
 
                 debugLog('BADGE_CHECK', `${player.name}: 총 ${totalGames}경기 출전`, { playerId, history: history.length });
 
-                // 출전 관련 배지 체크 (실제 BADGES ID 사용)
-                const gameBadgesToCheck = [
-                  { id: 'first_game', games: 1, name: '첫 출전' },
-                  { id: 'iron_man', games: 10, name: '철인' },
-                  { id: 'immortal', games: 30, name: '불멸의 선수' }
-                ];
+                // ✅ APPEARANCE_BADGES 사용 (시스템 배지)
+                const ownedBadgeIds = player.badges || [];
 
-                for (const badgeInfo of gameBadgesToCheck) {
-                  // 해당 경기 수를 정확히 달성했고, 아직 배지가 없는 경우
-                  if (totalGames === badgeInfo.games && !player.badges?.includes(badgeInfo.id)) {
-                    const badge = BADGES[badgeInfo.id];
-                    if (badge) {
-                      console.log(`🎽 ${player.name}: ${badgeInfo.name} 배지 획득! (${totalGames}경기)`);
+                // 시스템 출전 배지 중 획득 가능한 배지 찾기
+                const eligibleBadge = findEligibleAppearanceBadge(totalGames, ownedBadgeIds);
 
-                      // 배지 즉시 수여
+                if (eligibleBadge) {
+                  // BADGES에서 실제 배지 정보 찾기
+                  const badge = BADGES[eligibleBadge.id];
+                  if (badge) {
+                    console.log(`🎽 ${player.name}: ${eligibleBadge.name} 배지 획득! (${totalGames}경기)`);
+
+                    // 배지 즉시 수여
+                    try {
+                      await firestoreService.savePlayerBadges(playerId, {
+                        badges: [...ownedBadgeIds, eligibleBadge.id],
+                        playerName: player.name
+                      });
+
+                      // UI에 표시할 배지 목록에 추가
+                      allNewBadges.push({
+                        ...badge,
+                        playerName: player.name
+                      });
+
+                      // 플레이어 객체에도 배지 추가 (UI 즉시 반영)
+                      player.badges = [...ownedBadgeIds, eligibleBadge.id];
+                    } catch (error) {
+                      console.error(`❌ ${player.name} ${eligibleBadge.name} 배지 저장 실패:`, error);
+                    }
+                  }
+                }
+
+                // 🔥 커스텀 배지 체크 (출전 횟수 조건)
+                try {
+                  for (const badge of appearanceBadges) {
+                    const minAppearances = badge.conditionData.minAppearances || 0;
+                    const badgeIdsList = ownedBadgeIds.map(b =>
+                      typeof b === 'string' ? b : b.badgeId
+                    );
+
+                    // 조건 충족 && 아직 보유하지 않음
+                    if (totalGames >= minAppearances && !badgeIdsList.includes(badge.id)) {
+                      console.log(`🎽 ${player.name}: 커스텀 배지 "${badge.name}" 획득! (${totalGames}경기 >= ${minAppearances})`);
+
                       try {
-                        await firestoreService.savePlayerBadges(playerId, {
-                          badges: [...(player.badges || []), badgeInfo.id],
-                          playerName: player.name
-                        });
+                        await firestoreService.awardManualBadge(
+                          user.uid,
+                          playerId,
+                          badge.id,
+                          `경기 시작 시 자동 수여 (출전 ${totalGames}회)`
+                        );
 
                         // UI에 표시할 배지 목록에 추가
                         allNewBadges.push({
@@ -384,12 +444,14 @@ const GameScreen = ({ gameId, onExit }) => {
                         });
 
                         // 플레이어 객체에도 배지 추가 (UI 즉시 반영)
-                        player.badges = [...(player.badges || []), badgeInfo.id];
+                        player.badges = [...(player.badges || []), badge.id];
                       } catch (error) {
-                        console.error(`❌ ${player.name} ${badgeInfo.name} 배지 저장 실패:`, error);
+                        console.error(`❌ ${player.name} 커스텀 배지 "${badge.name}" 저장 실패:`, error);
                       }
                     }
                   }
+                } catch (error) {
+                  console.error(`❌ ${player.name} 커스텀 배지 체크 실패:`, error);
                 }
               }
 
@@ -693,6 +755,99 @@ const GameScreen = ({ gameId, onExit }) => {
     }
 
     try {
+      // ===== 자동 배지 수여 로직 =====
+
+      // 1. 커스텀 배지 로드
+      const customBadges = await loadCustomBadges(user.uid);
+      console.log(`📋 커스텀 배지 ${customBadges.length}개 로드됨`);
+
+      // 2. 모든 선수 목록
+      const allPlayers = [...game.teamA.lineup, ...game.teamB.lineup];
+
+      // 3. 각 선수별로 자동 배지 체크 및 수여
+      let totalBadgesAwarded = 0;
+      const awardedBadgesInfo = []; // 🎉 수여된 배지 정보 수집
+
+      for (const player of allPlayers) {
+        const playerId = player.playerId || player.id;
+        if (!playerId) continue;
+
+        try {
+          // 선수의 전체 경기 히스토리 가져오기
+          const historyData = await firestoreService.getPlayerHistory(playerId);
+          const playerHistory = historyData?.games || [];
+
+          // 🔥 현재 경기 스탯 가져오기
+          const currentGameStats = player.stats || {
+            hits: 0,
+            homerun: 0,
+            runs: 0,
+          };
+
+          // 선수의 누적 통계 계산 (과거 + 현재 경기 포함)
+          const stats = {
+            gamesPlayed: playerHistory.length + 1, // 현재 경기 포함
+            hits: currentGameStats.hits || 0, // 현재 경기부터 시작
+            homeRuns: currentGameStats.homerun || 0,
+            runs: currentGameStats.runs || 0,
+            stolenBases: 0, // 현재 미지원
+            rbis: 0, // 현재 미지원
+            battingAvg: 0, // 현재 미지원 (타석 수 정보 없음)
+          };
+
+          // 과거 경기 통계 누적
+          playerHistory.forEach(game => {
+            const gameStats = game.stats || {};
+            stats.hits += gameStats.hits || 0;
+            stats.homeRuns += gameStats.homerun || 0;
+            stats.runs += gameStats.runs || 0;
+          });
+
+          console.log(`📊 ${player.name} 통계 (현재 경기 포함):`, stats);
+
+          // 선수가 현재 보유한 배지 목록
+          const badgeData = await firestoreService.getPlayerBadges(playerId);
+          const ownedBadges = (badgeData?.badges || []).map(b => b.badgeId);
+
+          // 조건을 만족하는 배지 찾기
+          const eligibleBadges = findEligibleBadges(stats, customBadges, ownedBadges);
+
+          // 배지 수여
+          for (const badgeId of eligibleBadges) {
+            try {
+              await firestoreService.awardManualBadge(
+                user.uid,
+                playerId,
+                badgeId,
+                '조건 달성으로 자동 수여됨'
+              );
+              totalBadgesAwarded++;
+              console.log(`✅ ${player.name}에게 배지 "${badgeId}" 자동 수여`);
+
+              // 🎉 배지 정보 수집 (모달에 표시하기 위함)
+              const badgeInfo = customBadges.find(b => b.id === badgeId);
+              if (badgeInfo) {
+                awardedBadgesInfo.push({
+                  ...badgeInfo,
+                  playerName: player.name
+                });
+              }
+            } catch (error) {
+              console.error(`❌ 배지 "${badgeId}" 수여 실패:`, error);
+            }
+          }
+        } catch (error) {
+          console.error(`❌ ${player.name} 배지 체크 실패:`, error);
+        }
+      }
+
+      // 4. 배지 수여 결과 로그
+      if (totalBadgesAwarded > 0) {
+        console.log(`🎉 총 ${totalBadgesAwarded}개 배지 자동 수여 완료`);
+      }
+
+      // ===== 기존 경기 종료 로직 =====
+
       // 경기 종료 및 선수 히스토리 저장
       const finalGameData = {
         ...game,
@@ -746,8 +901,10 @@ const GameScreen = ({ gameId, onExit }) => {
 
       await firestoreService.finishGame(game.id, finalGameData);
       console.log('✅ 경기가 종료되고 선수 기록이 저장되었습니다.');
-      alert('✅ 경기가 종료되었습니다.');
-      onExit?.();
+
+      // 🎉 GameEndModal 표시
+      setGameEndData(finalGameData);
+      setShowGameEndModal(true);
     } catch (error) {
       console.error('❌ 경기 종료 실패:', error);
       alert('❌ 경기 종료에 실패했습니다.');
@@ -3422,6 +3579,16 @@ const GameScreen = ({ gameId, onExit }) => {
       <StudentCodeListModal
         isOpen={showStudentCodeModal}
         onClose={() => setShowStudentCodeModal(false)}
+      />
+
+      {/* 경기 종료 모달 */}
+      <GameEndModal
+        open={showGameEndModal}
+        onClose={() => {
+          setShowGameEndModal(false);
+          onExit?.();
+        }}
+        gameData={gameEndData}
       />
     </div>
   );
