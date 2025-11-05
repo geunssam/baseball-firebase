@@ -19,6 +19,7 @@ import ClassShareSettingsModal from './ClassShareSettingsModal';
 import ShareManagementModal from './ShareManagementModal';
 import SharedItemsSection from './SharedItemsSection';
 import { isSharedItem, canEdit, canManage, getPermissionBadgeInfo } from '../utils/permissionHelpers.jsx';
+import PlayerBadgeDisplay from './PlayerBadgeDisplay';
 
 /**
  * SortablePlayerRow
@@ -77,7 +78,7 @@ const SortablePlayerRow = ({ player, index, isTeamEditMode, positions, onChangeP
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid grid-cols-[auto_auto_1fr_120px_32px] gap-2 items-center px-1.5 py-1.5 border rounded-lg hover:bg-muted/50 transition-colors group bg-background ${
+      className={`grid grid-cols-[auto_auto_auto_1fr_120px_32px] gap-2 items-center px-1.5 py-1.5 border rounded-lg hover:bg-muted/50 transition-colors group bg-background ${
         isDragging ? 'opacity-50 z-50' : ''
       }`}
     >
@@ -97,6 +98,17 @@ const SortablePlayerRow = ({ player, index, isTeamEditMode, positions, onChangeP
         <div className="inline-flex items-center justify-center bg-slate-100 text-black px-2 py-1 rounded-full font-bold text-sm border-2 border-slate-300 whitespace-nowrap">
           {player.battingOrder || index + 1}번
         </div>
+      </div>
+
+      {/* 배지 */}
+      <div className="flex items-center justify-start px-1">
+        <PlayerBadgeDisplay
+          player={player}
+          maxBadges={3}
+          size="sm"
+          showEmpty={false}
+          showOverflow={true}
+        />
       </div>
 
       {/* 이름 + 학년-반 배지 */}
@@ -207,8 +219,19 @@ const SortablePlayerRowForNewTeam = ({ player, index, autoPosition, currentPosit
         </span>
       </div>
 
+      {/* 배지 */}
+      <div className="col-span-2">
+        <PlayerBadgeDisplay
+          player={player}
+          maxBadges={3}
+          size="sm"
+          showEmpty={false}
+          showOverflow={true}
+        />
+      </div>
+
       {/* 이름 */}
-      <div className="col-span-3">
+      <div className="col-span-2">
         <div className="flex flex-col gap-1">
           <span className="font-semibold text-sm">{player.name}</span>
           {player.className && (
@@ -220,7 +243,7 @@ const SortablePlayerRowForNewTeam = ({ player, index, autoPosition, currentPosit
       </div>
 
       {/* 포지션 드롭다운 */}
-      <div className="col-span-6">
+      <div className="col-span-5">
         <Select
           value={currentPosition || autoPosition}
           onValueChange={(value) => onPositionChange(player.id, value)}
@@ -1281,58 +1304,75 @@ export default function ClassTeamManagementView() {
             {/* 학생 목록 (5열 그리드) */}
             <div className="grid grid-cols-5 gap-2">
               {(studentsByClass[selectedClass] || []).map((student) => (
-                <div
-                  key={student.id}
-                  className={`
-                    relative py-1.5 px-1 rounded-lg border-2 text-xs font-medium transition-all
-                    ${
-                      selectedStudents.includes(student.id)
-                        ? 'bg-primary/10 border-primary text-primary'
-                        : 'bg-card border-border hover:border-primary/50'
-                    }
-                  `}
-                >
-                  <button
-                    onClick={() => toggleStudentSelection(student.id)}
-                    className="w-full"
+                  <div
+                    key={student.id}
+                    className={`
+                      relative py-1.5 px-1 rounded-lg border-2 text-xs font-medium transition-all
+                      ${
+                        selectedStudents.includes(student.id)
+                          ? 'bg-primary/10 border-primary text-primary'
+                          : 'bg-card border-border hover:border-primary/50'
+                      }
+                    `}
                   >
-                    {/* 이름 (가운데 정렬) */}
-                    <div className="flex items-center justify-center gap-1.5 mb-1">
-                      <span className="text-base">
-                        {student.gender === 'male' ? '👨‍🎓' : student.gender === 'female' ? '👩‍🎓' : '👨‍🎓'}
-                      </span>
-                      <span className="font-bold text-sm">{student.name}</span>
-                    </div>
-                  </button>
-                  {isClassEditMode && (
-                    <div className="flex justify-center">
+                    <button
+                      onClick={() => toggleStudentSelection(student.id)}
+                      className="w-full h-8 flex items-center justify-center"
+                    >
+                      {/* 성별 | 배지 | 이름 (고정 영역) */}
+                      <div className="flex items-center justify-center gap-1.5 w-full px-1">
+                        {/* 성별 아이콘 - 고정 너비 */}
+                        <span className="text-base flex-shrink-0 w-5">
+                          {student.gender === 'male' ? '👨‍🎓' : student.gender === 'female' ? '👩‍🎓' : '👨‍🎓'}
+                        </span>
+
+                        {/* 배지 표시 - 고정 너비 */}
+                        <div className="flex-shrink-0 w-16 flex justify-center">
+                          <PlayerBadgeDisplay
+                            player={student}
+                            maxBadges={3}
+                            size="sm"
+                            showEmpty={false}
+                            showOverflow={true}
+                          />
+                        </div>
+
+                        {/* 이름 - 나머지 공간, 긴 이름은 말줄임 */}
+                        <span className="font-bold text-sm truncate flex-1 text-center">
+                          {student.name}
+                        </span>
+                      </div>
+                    </button>
+                    {isClassEditMode && (
+                      <div className="flex justify-center">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const newGender = student.gender === 'male' ? 'female' : 'male';
+                            updateStudent(student.id, { gender: newGender });
+                          }}
+                          className="mt-1 text-[10px] px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 rounded text-blue-700 transition-colors"
+                          title="성별 변경"
+                        >
+                          {student.gender === 'male' ? '👨→👩' : '👩→👨'}
+                        </button>
+                      </div>
+                    )}
+                    {isClassEditMode && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          const newGender = student.gender === 'male' ? 'female' : 'male';
-                          updateStudent(student.id, { gender: newGender });
+                          handleOpenDeleteStudent(student);
                         }}
-                        className="mt-1 text-[10px] px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 rounded text-blue-700 transition-colors"
-                        title="성별 변경"
+                        className="absolute -top-1 -right-1 bg-rose-200 text-rose-700 rounded-full p-0.5 hover:bg-rose-300 transition-colors"
+                        title="삭제"
                       >
-                        {student.gender === 'male' ? '👨→👩' : '👩→👨'}
+                        <X className="w-3 h-3" />
                       </button>
-                    </div>
-                  )}
-                  {isClassEditMode && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenDeleteStudent(student);
-                      }}
-                      className="absolute -top-1 -right-1 bg-rose-200 text-rose-700 rounded-full p-0.5 hover:bg-rose-300 transition-colors"
-                      title="삭제"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              ))}
+                    )}
+                  </div>
+                )
+              )}
             </div>
           </Card>
         ) : (
@@ -1551,11 +1591,12 @@ export default function ClassTeamManagementView() {
             {selectedTeam.players && selectedTeam.players.length > 0 ? (
               <div className="space-y-2">
                 {/* 테이블 헤더 */}
-                <div className="grid grid-cols-[auto_auto_1fr_120px_32px] gap-2 items-center px-1.5 py-1.5 bg-muted/30 rounded-lg text-xs font-semibold text-muted-foreground">
+                <div className="grid grid-cols-[auto_auto_auto_1fr_120px_32px] gap-2 items-center px-1.5 py-1.5 bg-muted/30 rounded-lg text-xs font-semibold text-muted-foreground">
                   <div className="text-center w-6">
                     <GripVertical className="w-3 h-3 mx-auto text-muted-foreground" />
                   </div>
                   <div className="text-center">타순</div>
+                  <div className="text-center">배지</div>
                   <div>이름</div>
                   <div className="text-center w-[120px]">포지션</div>
                   <div className="w-8"></div>

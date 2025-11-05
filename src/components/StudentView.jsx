@@ -4,7 +4,8 @@ import { collection, query, where, getDocs, doc, getDoc, orderBy, limit } from '
 import { db } from '../config/firebase';
 import { BADGES } from '../utils/badgeSystem';
 import StudentGameHistory from './StudentGameHistory';
-import { getPlayerDetailedHistory } from '../services/firestoreService';
+import { getPlayerDetailedHistory, updatePlayerBadgeOrder } from '../services/firestoreService';
+import PlayerBadgeOrderModal from './PlayerBadgeOrderModal';
 
 // 🔹 배지 티어 정의
 const BADGE_TIERS = {
@@ -22,6 +23,7 @@ export default function StudentView() {
   const [classRanking, setClassRanking] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isBadgeOrderModalOpen, setIsBadgeOrderModalOpen] = useState(false);
 
   // 🔹 학생 데이터 로드 (1분마다 자동 갱신)
   useEffect(() => {
@@ -289,6 +291,28 @@ export default function StudentView() {
     }
   };
 
+  // 🔹 배지 순서 저장 핸들러
+  const handleSaveBadgeOrder = async (newBadgeOrder) => {
+    try {
+      await updatePlayerBadgeOrder(
+        studentData.teacherId,
+        studentData.playerId,
+        newBadgeOrder
+      );
+
+      // 배지 순서 업데이트
+      const updatedBadges = newBadgeOrder.map(badgeId => {
+        return badges.find(b => b.badge_id === badgeId);
+      }).filter(Boolean);
+
+      setBadges(updatedBadges);
+      setIsBadgeOrderModalOpen(false);
+    } catch (error) {
+      console.error('배지 순서 저장 실패:', error);
+      setError('배지 순서를 저장하는 중 오류가 발생했습니다.');
+    }
+  };
+
   // 🔹 배지 등급별 색상 (파스텔톤)
   const getTierColor = (tier) => {
     const tierColors = {
@@ -366,9 +390,19 @@ export default function StudentView() {
 
         {/* 배지 컬렉션 */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-          <h2 className="text-3xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            🏅 나의 배지
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+              🏅 나의 배지
+            </h2>
+            {badges.length > 0 && (
+              <button
+                onClick={() => setIsBadgeOrderModalOpen(true)}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium"
+              >
+                🔀 배지 순서 변경
+              </button>
+            )}
+          </div>
           {badges.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <div className="text-6xl mb-4">🎯</div>
@@ -480,6 +514,17 @@ export default function StudentView() {
             </div>
           )}
         </div>
+
+        {/* 배지 순서 변경 모달 */}
+        <PlayerBadgeOrderModal
+          open={isBadgeOrderModalOpen}
+          onOpenChange={setIsBadgeOrderModalOpen}
+          player={{
+            name: studentData?.playerName || '학생',
+            badges: badges.map(b => b.badge_id)
+          }}
+          onSave={handleSaveBadgeOrder}
+        />
       </div>
     </div>
   );

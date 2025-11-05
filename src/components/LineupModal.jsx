@@ -5,6 +5,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import PlayerBadgeDisplay from './PlayerBadgeDisplay';
 
 const POSITION_OPTIONS = ['포수', '1루수', '2루수', '3루수', '자유수비', '외야수', '직접입력'];
 
@@ -27,6 +28,15 @@ const SortableRow = ({ player, index, onPositionChange }) => {
     <tr ref={setNodeRef} style={style} className="border-b hover:bg-accent/5">
       <td className="p-3 text-center font-bold text-lg bg-muted/30">
         {index + 1}
+      </td>
+      <td className="p-3">
+        <PlayerBadgeDisplay
+          player={player}
+          maxBadges={3}
+          size="sm"
+          showEmpty={false}
+          showOverflow={true}
+        />
       </td>
       <td className="p-3">
         <div className="flex items-center gap-2">
@@ -150,6 +160,7 @@ const LineupModal = ({ open, onOpenChange, team, onSaveLineup }) => {
                 <thead className="bg-muted">
                   <tr>
                     <th className="p-3 text-sm font-semibold border w-20">타순</th>
+                    <th className="p-3 text-sm font-semibold border w-32">배지</th>
                     <th className="p-3 text-sm font-semibold border">선수명</th>
                     <th className="p-3 text-sm font-semibold border">수비 포지션</th>
                   </tr>

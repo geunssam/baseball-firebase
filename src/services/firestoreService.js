@@ -414,13 +414,32 @@ class FirestoreService {
       // 생성 시간 순서대로 정렬하여 학생 목록 가져오기
       const q = query(studentsRef, orderBy('createdAt', 'asc'));
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
+      const unsubscribe = onSnapshot(q, async (snapshot) => {
         const students = [];
-        snapshot.forEach((doc) => {
-          students.push({ id: doc.id, ...doc.data() });
-        });
 
-        console.log(`🔄 학생 동기화: ${students.length}명 (생성 시간순 정렬)`);
+        // 학생 데이터와 배지 정보를 함께 불러오기
+        for (const doc of snapshot.docs) {
+          const studentData = { id: doc.id, ...doc.data() };
+
+          // 배지 정보 불러오기
+          try {
+            const badgesDocRef = this.getUserDoc('playerBadges', studentData.playerId || doc.id);
+            const badgesSnapshot = await getDoc(badgesDocRef);
+
+            if (badgesSnapshot.exists()) {
+              studentData.badges = badgesSnapshot.data().badges || [];
+            } else {
+              studentData.badges = [];
+            }
+          } catch (error) {
+            console.warn(`⚠️ 배지 불러오기 실패 (${studentData.name}):`, error);
+            studentData.badges = [];
+          }
+
+          students.push(studentData);
+        }
+
+        console.log(`🔄 학생 동기화: ${students.length}명 (배지 포함, 생성 시간순 정렬)`);
         callback(students);
       }, (error) => {
         console.error('❌ 학생 리스너 오류:', error);
@@ -2132,6 +2151,27 @@ export async function removeUserFromShare(shareId, targetUserId) {
     console.log('✅ 공유 해제 완료');
   } catch (error) {
     console.error('❌ 공유 해제 실패:', error);
+    throw error;
+  }
+}
+
+/**
+ * 학생의 배지 순서 업데이트
+ * @param {string} teacherId - 선생님 ID
+ * @param {string} playerId - 학생 ID
+ * @param {string[]} badgeOrder - 배지 ID 배열 (순서대로)
+ * @returns {Promise<void>}
+ */
+export async function updatePlayerBadgeOrder(teacherId, playerId, badgeOrder) {
+  try {
+    const playerBadgesRef = doc(db, 'users', teacherId, 'playerBadges', playerId);
+    await updateDoc(playerBadgesRef, {
+      badges: badgeOrder,
+      updatedAt: serverTimestamp()
+    });
+    console.log('✅ 배지 순서 업데이트 완료');
+  } catch (error) {
+    console.error('❌ 배지 순서 업데이트 실패:', error);
     throw error;
   }
 }

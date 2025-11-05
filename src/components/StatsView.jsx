@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { calculateMVPScore } from '../utils/mvpCalculator';
 import { calculatePlayerPoints } from '../utils/statsHelpers';
 import SelectedGamesModal from './SelectedGamesModal';
+import PlayerBadgeDisplay from './PlayerBadgeDisplay';
 
 const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
   const [statsSubTab, setStatsSubTab] = useState('scoreboard');
@@ -266,6 +267,7 @@ const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
                                 <table className="w-full text-2xl border-collapse">
                                   <thead className="bg-blue-50">
                                     <tr className="font-bold">
+                                      <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-32">배지</th>
                                       <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-36">이름</th>
                                       <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-32">포지션</th>
                                       <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-24">안타</th>
@@ -278,6 +280,17 @@ const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
                                   <tbody>
                                     {game.teamA?.lineup?.sort((a, b) => (a.battingOrder || 999) - (b.battingOrder || 999)).map((player, idx) => (
                                       <tr key={idx} className="hover:bg-blue-50/50">
+                                        <td className="border-2 border-gray-300 p-4 text-center">
+                                          <div className="flex justify-center">
+                                            <PlayerBadgeDisplay
+                                              player={player}
+                                              maxBadges={3}
+                                              size="sm"
+                                              showEmpty={false}
+                                              showOverflow={true}
+                                            />
+                                          </div>
+                                        </td>
                                         <td className="border-2 border-gray-300 p-4 text-center font-bold text-gray-900">{player.name}</td>
                                         <td className="border-2 border-gray-300 p-4 text-center font-semibold text-gray-900">{player.position || '-'}</td>
                                         <td className="border-2 border-gray-300 p-4 text-center font-bold text-green-600">{player.stats?.hits || 0}</td>
@@ -313,6 +326,7 @@ const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
                                 <table className="w-full text-2xl border-collapse">
                                   <thead className="bg-red-50">
                                     <tr className="font-bold">
+                                      <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-32">배지</th>
                                       <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-36">이름</th>
                                       <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-32">포지션</th>
                                       <th className="border-2 border-gray-300 p-4 text-center text-gray-900 w-24">안타</th>
@@ -325,6 +339,17 @@ const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
                                   <tbody>
                                     {game.teamB?.lineup?.sort((a, b) => (a.battingOrder || 999) - (b.battingOrder || 999)).map((player, idx) => (
                                       <tr key={idx} className="hover:bg-red-50/50">
+                                        <td className="border-2 border-gray-300 p-4 text-center">
+                                          <div className="flex justify-center">
+                                            <PlayerBadgeDisplay
+                                              player={player}
+                                              maxBadges={3}
+                                              size="sm"
+                                              showEmpty={false}
+                                              showOverflow={true}
+                                            />
+                                          </div>
+                                        </td>
                                         <td className="border-2 border-gray-300 p-4 text-center font-bold text-gray-900">{player.name}</td>
                                         <td className="border-2 border-gray-300 p-4 text-center font-semibold text-gray-900">{player.position || '-'}</td>
                                         <td className="border-2 border-gray-300 p-4 text-center font-bold text-green-600">{player.stats?.hits || 0}</td>
