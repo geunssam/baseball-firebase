@@ -411,7 +411,7 @@ class FirestoreService {
       const studentsRef = this.getUserCollection('students');
       console.log('📡 [FirestoreService] subscribeToStudents 시작');
 
-      // 생성 시간 순서대로 정렬하여 학생 목록 가져오기
+      // 생성 시간 순서대로 정렬하여 학생 목록 가져오기 (입력 순서 = 번호순)
       const q = query(studentsRef, orderBy('createdAt', 'asc'));
 
       const unsubscribe = onSnapshot(q, async (snapshot) => {
@@ -439,7 +439,7 @@ class FirestoreService {
           students.push(studentData);
         }
 
-        console.log(`🔄 학생 동기화: ${students.length}명 (배지 포함, 생성 시간순 정렬)`);
+        console.log(`🔄 학생 동기화: ${students.length}명 (배지 포함, 학급명·번호순 정렬)`);
         callback(students);
       }, (error) => {
         console.error('❌ 학생 리스너 오류:', error);

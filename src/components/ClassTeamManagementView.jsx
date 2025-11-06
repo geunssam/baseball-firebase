@@ -25,9 +25,12 @@ import PlayerBadgeDisplay from './PlayerBadgeDisplay';
  * SortablePlayerRow
  * 드래그 가능한 선수 행
  */
-const SortablePlayerRow = ({ player, index, isTeamEditMode, positions, onChangePosition, onRemove }) => {
+const SortablePlayerRow = ({ player, index, isTeamEditMode, positions, onChangePosition, onRemove, students }) => {
   const [isCustomInput, setIsCustomInput] = useState(false);
   const [customPosition, setCustomPosition] = useState('');
+
+  // students 배열에서 해당 학생 찾기 (배지 정보 포함)
+  const studentWithBadges = students.find(s => s.id === player.id || s.playerId === player.id) || player;
 
   const {
     attributes,
@@ -78,7 +81,7 @@ const SortablePlayerRow = ({ player, index, isTeamEditMode, positions, onChangeP
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid grid-cols-[auto_auto_auto_1fr_120px_32px] gap-2 items-center px-1.5 py-1.5 border rounded-lg hover:bg-muted/50 transition-colors group bg-background ${
+      className={`grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_1fr_32px] gap-3 items-center px-1.5 py-1.5 border rounded-lg hover:bg-muted/50 transition-colors group bg-background ${
         isDragging ? 'opacity-50 z-50' : ''
       }`}
     >
@@ -95,61 +98,75 @@ const SortablePlayerRow = ({ player, index, isTeamEditMode, positions, onChangeP
 
       {/* 타순 */}
       <div className="flex items-center justify-center">
-        <div className="inline-flex items-center justify-center bg-slate-100 text-black px-2 py-1 rounded-full font-bold text-sm border-2 border-slate-300 whitespace-nowrap">
+        <div className="inline-flex items-center justify-center bg-slate-100 text-black px-2.5 py-1.5 rounded-full font-bold text-base border-2 border-slate-300 whitespace-nowrap">
           {player.battingOrder || index + 1}번
         </div>
       </div>
 
       {/* 배지 */}
-      <div className="flex items-center justify-start px-1">
+      <div className="flex items-center justify-center">
         <PlayerBadgeDisplay
-          player={player}
+          player={studentWithBadges}
           maxBadges={3}
-          size="sm"
+          size="md"
           showEmpty={false}
           showOverflow={true}
         />
       </div>
 
-      {/* 이름 + 학년-반 배지 */}
-      <div className="flex items-center gap-1.5">
-        <span className="font-bold text-sm">{player.name}</span>
-        {player.className && (
-          <Badge variant="outline" className="text-[10px] bg-muted px-1 py-0">
+      {/* 이름 */}
+      <div className="flex items-center justify-center min-w-0">
+        <span className="font-bold text-base truncate">{player.name}</span>
+      </div>
+
+      {/* 학급 */}
+      <div className="flex items-center justify-center">
+        {player.className ? (
+          <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200 text-blue-700 px-2 py-0.5 whitespace-nowrap">
             {player.className}
           </Badge>
+        ) : (
+          <span className="text-xs text-muted-foreground">-</span>
         )}
-        <span className="text-[10px] text-muted-foreground">#{player.number || index + 1}</span>
+      </div>
+
+      {/* 학급번호 */}
+      <div className="flex items-center justify-center">
+        {player.number ? (
+          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">#{player.number}</span>
+        ) : (
+          <span className="text-xs text-muted-foreground">-</span>
+        )}
       </div>
 
       {/* 포지션 드롭박스 또는 직접입력 */}
-      <div className="w-[120px]">
+      <div className="flex items-center justify-center w-full">
         {isCustomInput ? (
-          <div className="flex gap-1">
+          <div className="flex gap-1 w-full">
             <Input
               placeholder="포지션 입력"
               value={customPosition}
               onChange={(e) => setCustomPosition(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCustomPositionSubmit()}
-              className="h-7 text-xs flex-1"
+              className="h-8 text-sm flex-1"
               autoFocus
             />
             <Button
               size="sm"
               onClick={handleCustomPositionSubmit}
-              className="h-7 px-1.5"
+              className="h-8 px-2"
             >
               ✓
             </Button>
           </div>
         ) : (
           <Select value={player.position || ''} onValueChange={handlePositionChange}>
-            <SelectTrigger className="h-7 text-xs">
+            <SelectTrigger className="h-8 text-sm w-full">
               <SelectValue placeholder="포지션 선택" />
             </SelectTrigger>
             <SelectContent>
               {positions.map((pos) => (
-                <SelectItem key={pos} value={pos} className="text-xs">
+                <SelectItem key={pos} value={pos} className="text-sm">
                   {pos}
                 </SelectItem>
               ))}
@@ -504,8 +521,14 @@ export default function ClassTeamManagementView() {
         return;
       }
 
-      // 모든 학생을 순차적으로 추가
-      for (const line of lines) {
+      // 해당 학급의 현재 학생 수 확인하여 번호 시작점 결정
+      const classStudents = students.filter(s => s.className === targetClass);
+      let startNumber = classStudents.length + 1;
+
+      // 모든 학생을 순차적으로 추가 (위에서부터 순서대로 번호 부여)
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
         // 이름,성별 형식으로 파싱
         const parts = line.split(',').map(p => p.trim());
         const name = parts[0];
@@ -523,6 +546,7 @@ export default function ClassTeamManagementView() {
           name,
           className: targetClass,
           gender,
+          number: startNumber + i, // 순서대로 번호 부여
         });
       }
 
@@ -1222,7 +1246,7 @@ export default function ClassTeamManagementView() {
             {visibleClasses.map((className) => (
               <Card
                 key={className}
-                className={`relative py-1.5 px-2 cursor-pointer transition-all hover:shadow-md ${
+                className={`relative py-3 px-3 cursor-pointer transition-all hover:shadow-md ${
                   selectedClass === className ? 'ring-2 ring-primary bg-primary/5' : ''
                 }`}
                 onClick={() => setSelectedClass(selectedClass === className ? null : className)}
@@ -1239,10 +1263,10 @@ export default function ClassTeamManagementView() {
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
-                <div className="flex items-center justify-center gap-1.5 text-sm">
-                  <span className="font-bold text-foreground">{className}</span>
+                <div className="flex items-center justify-center gap-2 text-base">
+                  <span className="font-bold text-foreground text-lg">{className}</span>
                   <span className="text-muted-foreground">|</span>
-                  <span className="text-[11px] text-muted-foreground">
+                  <span className="text-sm text-muted-foreground">
                     {studentsByClass[className].length}명
                   </span>
                 </div>
@@ -1301,13 +1325,13 @@ export default function ClassTeamManagementView() {
               </Button>
             </div>
 
-            {/* 학생 목록 (5열 그리드) */}
-            <div className="grid grid-cols-5 gap-2">
+            {/* 학생 목록 (4열 그리드로 카드 크기 확대) */}
+            <div className="grid grid-cols-4 gap-3">
               {(studentsByClass[selectedClass] || []).map((student) => (
                   <div
                     key={student.id}
                     className={`
-                      relative py-1.5 px-1 rounded-lg border-2 text-xs font-medium transition-all
+                      relative py-3 px-3 rounded-lg border-2 text-xs font-medium transition-all
                       ${
                         selectedStudents.includes(student.id)
                           ? 'bg-primary/10 border-primary text-primary'
@@ -1317,30 +1341,36 @@ export default function ClassTeamManagementView() {
                   >
                     <button
                       onClick={() => toggleStudentSelection(student.id)}
-                      className="w-full h-8 flex items-center justify-center"
+                      className="w-full flex flex-col items-center justify-center gap-2.5"
                     >
-                      {/* 성별 | 배지 | 이름 (고정 영역) */}
-                      <div className="flex items-center justify-center gap-1.5 w-full px-1">
-                        {/* 성별 아이콘 - 고정 너비 */}
-                        <span className="text-base flex-shrink-0 w-5">
+                      {/* 첫 번째 줄: 성별 + 배지 */}
+                      <div className="flex items-center justify-center gap-2 w-full">
+                        {/* 성별 아이콘 */}
+                        <span className="text-2xl">
                           {student.gender === 'male' ? '👨‍🎓' : student.gender === 'female' ? '👩‍🎓' : '👨‍🎓'}
                         </span>
 
-                        {/* 배지 표시 - 고정 너비 */}
-                        <div className="flex-shrink-0 w-16 flex justify-center">
-                          <PlayerBadgeDisplay
-                            player={student}
-                            maxBadges={3}
-                            size="sm"
-                            showEmpty={false}
-                            showOverflow={true}
-                          />
-                        </div>
+                        {/* 배지 표시 */}
+                        <PlayerBadgeDisplay
+                          player={student}
+                          maxBadges={3}
+                          size="md"
+                          showEmpty={false}
+                          showOverflow={true}
+                        />
+                      </div>
 
-                        {/* 이름 - 나머지 공간, 긴 이름은 말줄임 */}
-                        <span className="font-bold text-sm truncate flex-1 text-center">
-                          {student.name}
-                        </span>
+                      {/* 두 번째 줄: 이름 (크게) */}
+                      <div className="font-bold text-lg text-center w-full">
+                        {student.name}
+                      </div>
+
+                      {/* 세 번째 줄: 통계 정보 */}
+                      <div className="text-sm text-muted-foreground text-center w-full">
+                        {student.badges && student.badges.length > 0
+                          ? `🏆 배지 ${student.badges.length}개`
+                          : '경기 기록 없음'
+                        }
                       </div>
                     </button>
                     {isClassEditMode && (
@@ -1452,7 +1482,7 @@ export default function ClassTeamManagementView() {
             {visibleTeams.map((team) => (
               <Card
                 key={team.id}
-                className={`relative py-1.5 px-2 cursor-pointer transition-all hover:shadow-md ${
+                className={`relative py-3 px-3 cursor-pointer transition-all hover:shadow-md ${
                   selectedTeam?.id === team.id ? 'ring-2 ring-primary bg-primary/5' : ''
                 }`}
                 onClick={() => setSelectedTeam(team)}
@@ -1469,24 +1499,26 @@ export default function ClassTeamManagementView() {
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
-                <div className="flex flex-col items-center justify-center gap-1 text-sm">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-foreground">{team.name}</span>
+                <div className="flex flex-col items-center justify-center gap-1.5">
+                  {/* 첫 번째 줄: 팀 이름 | 인원 */}
+                  <div className="flex items-center justify-center gap-2 text-base">
+                    <span className="font-bold text-foreground text-lg">{team.name}</span>
                     {isSharedItem(team) && (
-                      <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${getPermissionBadgeInfo(team.permission).color}`}>
+                      <Badge variant="outline" className={`text-[10px] px-1.5 py-0.5 ${getPermissionBadgeInfo(team.permission).color}`}>
                         {getPermissionBadgeInfo(team.permission).icon}
                       </Badge>
                     )}
+                    <span className="text-muted-foreground">|</span>
+                    <span className="text-sm text-muted-foreground">
+                      {team.players?.length || 0}명
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <span>선수 {team.players?.length || 0}명</span>
-                    {isSharedItem(team) && (
-                      <>
-                        <span>•</span>
-                        <span className="text-[10px]">{team.ownerName}</span>
-                      </>
-                    )}
-                  </div>
+                  {/* 두 번째 줄: 공유 정보 (있을 때만) */}
+                  {isSharedItem(team) && (
+                    <div className="text-xs text-muted-foreground">
+                      by {team.ownerName}
+                    </div>
+                  )}
                 </div>
               </Card>
             ))}
@@ -1591,14 +1623,16 @@ export default function ClassTeamManagementView() {
             {selectedTeam.players && selectedTeam.players.length > 0 ? (
               <div className="space-y-2">
                 {/* 테이블 헤더 */}
-                <div className="grid grid-cols-[auto_auto_auto_1fr_120px_32px] gap-2 items-center px-1.5 py-1.5 bg-muted/30 rounded-lg text-xs font-semibold text-muted-foreground">
+                <div className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_1fr_32px] gap-3 items-center px-1.5 py-2 bg-muted/30 rounded-lg text-sm font-semibold text-muted-foreground">
                   <div className="text-center w-6">
-                    <GripVertical className="w-3 h-3 mx-auto text-muted-foreground" />
+                    <GripVertical className="w-4 h-4 mx-auto text-muted-foreground" />
                   </div>
                   <div className="text-center">타순</div>
                   <div className="text-center">배지</div>
-                  <div>이름</div>
-                  <div className="text-center w-[120px]">포지션</div>
+                  <div className="text-center">이름</div>
+                  <div className="text-center">학급</div>
+                  <div className="text-center">번호</div>
+                  <div className="text-center">포지션</div>
                   <div className="w-8"></div>
                 </div>
 
@@ -1618,6 +1652,7 @@ export default function ClassTeamManagementView() {
                           positions={POSITIONS}
                           onChangePosition={handleChangePosition}
                           onRemove={handleRemovePlayerFromTeam}
+                          students={students}
                         />
                       ))}
                     </div>
