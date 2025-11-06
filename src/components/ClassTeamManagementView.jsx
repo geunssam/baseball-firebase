@@ -304,7 +304,7 @@ const SortablePlayerRowForNewTeam = ({ player, index, autoPosition, currentPosit
  */
 export default function ClassTeamManagementView() {
   const { user } = useAuth();
-  const { students, teams, createStudent, updateStudent, deleteStudent, createTeam, updateTeam, deleteTeam } = useGame();
+  const { classes, students, teams, createStudent, updateStudent, deleteStudent, createTeam, updateTeam, deleteTeam } = useGame();
 
   // ============================================
   // 상태 관리
@@ -370,31 +370,63 @@ export default function ClassTeamManagementView() {
   const [manageShareItem, setManageShareItem] = useState(null); // { type, id, name }
 
   // ============================================
-  // 학급별 학생 그룹화
+  // 학급별 학생 그룹화 (classes 컬렉션 사용)
   // ============================================
-  const studentsByClass = students.reduce((acc, student) => {
-    const className = student.className || '미지정';
-    if (!acc[className]) acc[className] = [];
-    acc[className].push(student);
-    return acc;
-  }, {});
+  const studentsByClass = useMemo(() => {
+    const grouped = {};
 
-  // 학급 이름을 생성 순서대로 정렬 (각 학급의 첫 번째 학생 생성 시간 기준)
-  const classNames = Object.keys(studentsByClass).sort((a, b) => {
-    const firstStudentA = studentsByClass[a][0];
-    const firstStudentB = studentsByClass[b][0];
+    // 1. classes 컬렉션의 모든 학급에 대해 빈 배열 초기화
+    classes.forEach(cls => {
+      grouped[cls.name] = [];
+    });
 
-    // createdAt이 없는 경우 대비
-    if (!firstStudentA?.createdAt || !firstStudentB?.createdAt) {
-      return a.localeCompare(b); // 이름순 정렬
+    // 2. '미지정' 그룹 추가
+    grouped['미지정'] = [];
+
+    // 3. 학생들을 해당 학급으로 분배
+    students.forEach(student => {
+      let targetClassName = '미지정';
+
+      // classId로 먼저 찾기 (새 방식)
+      if (student.classId) {
+        const cls = classes.find(c => c.id === student.classId);
+        if (cls) {
+          targetClassName = cls.name;
+        }
+      }
+      // className으로 찾기 (기존 방식, 하위 호환)
+      else if (student.className) {
+        targetClassName = student.className;
+        // 레거시 className이 grouped에 없으면 추가
+        if (!grouped[targetClassName]) {
+          grouped[targetClassName] = [];
+        }
+      }
+
+      grouped[targetClassName].push(student);
+    });
+
+    return grouped;
+  }, [students, classes]);
+
+  // 학급 이름 목록 (classes 컬렉션 생성 순서 유지)
+  const classNames = useMemo(() => {
+    // 1. classes 컬렉션의 학급들 (생성 순서 유지)
+    const names = classes.map(c => c.name);
+
+    // 2. 레거시 학급 이름 (classes 컬렉션에 없지만 학생이 있는 경우)
+    const legacyClassNames = Object.keys(studentsByClass).filter(
+      name => name !== '미지정' && !names.includes(name)
+    );
+
+    // 3. '미지정'은 마지막에 (학생이 있을 때만)
+    const result = [...names, ...legacyClassNames];
+    if (studentsByClass['미지정']?.length > 0) {
+      result.push('미지정');
     }
 
-    // Firestore Timestamp 비교
-    const timeA = firstStudentA.createdAt.toMillis ? firstStudentA.createdAt.toMillis() : firstStudentA.createdAt;
-    const timeB = firstStudentB.createdAt.toMillis ? firstStudentB.createdAt.toMillis() : firstStudentB.createdAt;
-
-    return timeA - timeB;
-  });
+    return result;
+  }, [classes, studentsByClass]);
 
   // ============================================
   // selectedTeam 자동 동기화
@@ -1218,13 +1250,15 @@ export default function ClassTeamManagementView() {
                 완료
               </Button>
             ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setIsClassEditMode(true)}
-              >
-                편집
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsClassEditMode(true)}
+                >
+                  편집
+                </Button>
+              </>
             )}
           </div>
         </div>

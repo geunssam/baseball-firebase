@@ -31,6 +31,7 @@ export const GameProvider = ({ children }) => {
   // ============================================
   // 상태 관리
   // ============================================
+  const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
   const [teams, setTeams] = useState([]);
   const [games, setGames] = useState([]);
@@ -47,6 +48,7 @@ export const GameProvider = ({ children }) => {
   useEffect(() => {
     if (!currentUser) {
       // 로그아웃 시 모든 데이터 초기화
+      setClasses([]);
       setStudents([]);
       setTeams([]);
       setGames([]);
@@ -59,14 +61,21 @@ export const GameProvider = ({ children }) => {
     setLoading(true);
     console.log('🚀 [GameContext] 리스너 연결 시작...');
 
-    // 1. 학생 목록 실시간 동기화
+    // 1. 학급 목록 실시간 동기화
+    const unsubscribeClasses = firestoreService.subscribeToClasses((updatedClasses) => {
+      console.log('🔄 [GameContext] 학급 목록 콜백 호출됨!', updatedClasses);
+      setClasses(updatedClasses);
+      console.log('🔄 [GameContext] 학급 목록 업데이트:', updatedClasses.length);
+    });
+
+    // 2. 학생 목록 실시간 동기화
     const unsubscribeStudents = firestoreService.subscribeToStudents((updatedStudents) => {
       console.log('🔄 [GameContext] 학생 목록 콜백 호출됨!', updatedStudents);
       setStudents(updatedStudents);
       console.log('🔄 [GameContext] 학생 목록 업데이트:', updatedStudents.length);
     });
 
-    // 2. 팀 목록 실시간 동기화
+    // 3. 팀 목록 실시간 동기화
     const unsubscribeTeams = firestoreService.subscribeToTeams((updatedTeams) => {
       console.log('🔄 [GameContext] 팀 목록 콜백 호출됨!', updatedTeams);
       // 각 팀의 players 상세 정보 출력
@@ -80,19 +89,19 @@ export const GameProvider = ({ children }) => {
       console.log('🔄 [GameContext] 팀 목록 업데이트:', updatedTeams.length);
     });
 
-    // 3. 진행 중 경기 목록 실시간 동기화
+    // 4. 진행 중 경기 목록 실시간 동기화
     const unsubscribeGames = firestoreService.subscribeToGames((updatedGames) => {
       setGames(updatedGames);
       console.log('🔄 [GameContext] 경기 목록 업데이트:', updatedGames.length);
     });
 
-    // 4. 종료된 경기 목록 실시간 동기화
+    // 5. 종료된 경기 목록 실시간 동기화
     const unsubscribeFinishedGames = firestoreService.subscribeToFinishedGames((updatedFinishedGames) => {
       setFinishedGames(updatedFinishedGames);
       console.log('🔄 [GameContext] 종료된 경기 목록 업데이트:', updatedFinishedGames.length);
     });
 
-    // 5. 초기 데이터 로드
+    // 6. 초기 데이터 로드
     const loadInitialData = async () => {
       try {
         // 선수 배지 로드
@@ -111,6 +120,7 @@ export const GameProvider = ({ children }) => {
 
     // 컴포넌트 언마운트 시 리스너 정리
     return () => {
+      unsubscribeClasses();
       unsubscribeStudents();
       unsubscribeTeams();
       unsubscribeGames();
@@ -118,6 +128,44 @@ export const GameProvider = ({ children }) => {
       console.log('🧹 [GameContext] 리스너 정리 완료');
     };
   }, [currentUser]);
+
+  // ============================================
+  // 학급 관리 함수
+  // ============================================
+
+  const createClass = async (classData) => {
+    try {
+      setSaveStatus('saving');
+      const classId = await firestoreService.createClass(classData);
+      setSaveStatus('saved');
+      return classId;
+    } catch (error) {
+      setSaveStatus('error');
+      throw error;
+    }
+  };
+
+  const updateClass = async (classId, updates) => {
+    try {
+      setSaveStatus('saving');
+      await firestoreService.updateClass(classId, updates);
+      setSaveStatus('saved');
+    } catch (error) {
+      setSaveStatus('error');
+      throw error;
+    }
+  };
+
+  const deleteClass = async (classId) => {
+    try {
+      setSaveStatus('saving');
+      await firestoreService.deleteClass(classId);
+      setSaveStatus('saved');
+    } catch (error) {
+      setSaveStatus('error');
+      throw error;
+    }
+  };
 
   // ============================================
   // 학생 관리 함수
@@ -349,6 +397,7 @@ export const GameProvider = ({ children }) => {
 
   const value = {
     // 상태
+    classes,
     students,
     teams,
     games,
@@ -357,6 +406,11 @@ export const GameProvider = ({ children }) => {
     playerHistory,
     loading,
     saveStatus,
+
+    // 학급 관리
+    createClass,
+    updateClass,
+    deleteClass,
 
     // 학생 관리
     createStudent,

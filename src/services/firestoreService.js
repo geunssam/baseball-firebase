@@ -36,6 +36,7 @@ class FirestoreService {
     this.db = db;
     this.currentUser = null;
     this.unsubscribers = []; // 리스너 정리용
+    this.listeners = {}; // 리스너 저장소 (classes, students, teams 등)
   }
 
   /**
@@ -279,12 +280,20 @@ class FirestoreService {
       const { generateStudentCode } = await import('../utils/studentCodeGenerator.js');
       const studentCode = generateStudentCode(userId, newStudentRef.id);
 
+      // classId 처리: className이 있으면 해당 학급 찾기
+      let classId = studentData.classId || null;
+      if (!classId && studentData.className) {
+        const classDoc = await this.getClassByName(studentData.className);
+        classId = classDoc?.id || null;
+      }
+
       const student = {
         ...studentData,
         ownerId: userId,
         playerId: newStudentRef.id, // playerId = studentId (stats 조회용)
         studentCode, // 학생 로그인 코드
         gender: studentData.gender || null, // 성별: 'male', 'female', null
+        classId, // 학급 ID (classes 컬렉션 참조)
         createdAt: serverTimestamp(),
       };
 
@@ -398,6 +407,147 @@ class FirestoreService {
     } catch (error) {
       console.error('❌ 학생 삭제 실패:', error);
       throw new Error('학생 삭제에 실패했습니다.');
+    }
+  }
+
+  // ============================================
+  // 학급 (Classes) 관리
+  // ============================================
+
+  /**
+   * 학급 생성
+   * @param {Object} classData - 학급 정보
+   * @returns {Promise<string>} 생성된 학급 ID
+   */
+  async createClass(classData) {
+    try {
+      const userId = this.getCurrentUserId();
+      const classesRef = this.getUserCollection('classes');
+      const newClassRef = doc(classesRef);
+
+      const classDoc = {
+        ...classData,
+        ownerId: userId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      await setDoc(newClassRef, classDoc);
+      console.log('✅ 학급 생성 완료:', newClassRef.id, classData.name);
+      return newClassRef.id;
+    } catch (error) {
+      console.error('❌ 학급 생성 실패:', error);
+      throw new Error('학급 생성에 실패했습니다.');
+    }
+  }
+
+  /**
+   * 모든 학급 가져오기
+   * @returns {Promise<Array>} 학급 목록
+   */
+  async getClasses() {
+    try {
+      const classesRef = this.getUserCollection('classes');
+      const snapshot = await getDocs(classesRef);
+
+      const classes = [];
+      snapshot.forEach((doc) => {
+        classes.push({ id: doc.id, ...doc.data() });
+      });
+
+      console.log(`✅ 학급 ${classes.length}개 로드 완료`);
+      return classes;
+    } catch (error) {
+      console.error('❌ 학급 로드 실패:', error);
+      throw new Error('학급 목록을 불러오는데 실패했습니다.');
+    }
+  }
+
+  /**
+   * 학급 목록 실시간 동기화
+   * @param {Function} callback - 학급 목록이 업데이트될 때 호출될 콜백 함수
+   * @returns {Function} unsubscribe 함수
+   */
+  subscribeToClasses(callback) {
+    try {
+      const classesRef = this.getUserCollection('classes');
+      const q = query(classesRef, orderBy('createdAt', 'asc'));
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const classes = [];
+        snapshot.forEach((doc) => {
+          classes.push({ id: doc.id, ...doc.data() });
+        });
+
+        console.log(`🔄 학급 동기화: ${classes.length}개`);
+        callback(classes);
+      }, (error) => {
+        console.error('❌ 학급 리스너 오류:', error);
+        callback([]);
+      });
+
+      this.listeners.classes = unsubscribe;
+      return unsubscribe;
+    } catch (error) {
+      console.error('❌ 학급 동기화 실패:', error);
+      throw new Error('학급 동기화에 실패했습니다.');
+    }
+  }
+
+  /**
+   * 학급 정보 업데이트
+   * @param {string} classId - 학급 ID
+   * @param {Object} updates - 업데이트할 데이터
+   */
+  async updateClass(classId, updates) {
+    try {
+      const classRef = this.getUserDoc('classes', classId);
+      await updateDoc(classRef, {
+        ...updates,
+        updatedAt: serverTimestamp()
+      });
+      console.log('✅ 학급 업데이트 완료:', classId);
+    } catch (error) {
+      console.error('❌ 학급 업데이트 실패:', error);
+      throw new Error('학급 업데이트에 실패했습니다.');
+    }
+  }
+
+  /**
+   * 학급 삭제
+   * @param {string} classId - 학급 ID
+   */
+  async deleteClass(classId) {
+    try {
+      const classRef = this.getUserDoc('classes', classId);
+      await deleteDoc(classRef);
+      console.log('✅ 학급 삭제 완료:', classId);
+    } catch (error) {
+      console.error('❌ 학급 삭제 실패:', error);
+      throw new Error('학급 삭제에 실패했습니다.');
+    }
+  }
+
+  /**
+   * 학급명으로 학급 찾기
+   * @param {string} className - 학급 이름
+   * @returns {Promise<Object|null>} 학급 문서 또는 null
+   */
+  async getClassByName(className) {
+    try {
+      const classesRef = this.getUserCollection('classes');
+      const q = query(classesRef, where('name', '==', className), limit(1));
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        return null;
+      }
+
+      const doc = snapshot.docs[0];
+      return { id: doc.id, ...doc.data() };
+    } catch (error) {
+      console.error('❌ 학급 조회 실패:', error);
+      return null;
     }
   }
 

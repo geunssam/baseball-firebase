@@ -124,6 +124,14 @@ service cloud.firestore {
         allow write: if isOwner(userId);
       }
 
+      // 학급 데이터
+      match /classes/{classId} {
+        // 읽기: 소유자만 가능
+        allow read: if isOwner(userId);
+        // 쓰기: 소유자만 가능
+        allow write: if isOwner(userId);
+      }
+
       // 학생 데이터 (Phase 1: 공유 권한 추가)
       match /students/{studentId} {
         // 읽기: 소유자만 가능 (자신의 학생만 조회)
