@@ -493,7 +493,7 @@ const SortableStudentCard = ({
  */
 export default function ClassTeamManagementView() {
   const { user } = useAuth();
-  const { classes, students, teams, createStudent, updateStudent, deleteStudent, createTeam, updateTeam, deleteTeam } = useGame();
+  const { classes, students, teams, createStudent, updateStudent, deleteStudent, deleteClass, createTeam, updateTeam, deleteTeam } = useGame();
 
   // ============================================
   // 상태 관리
@@ -1193,6 +1193,14 @@ export default function ClassTeamManagementView() {
     const studentsInClass = studentsByClass[className] || [];
     const studentCount = studentsInClass.length;
 
+    // className으로 class 객체 찾기
+    const classObj = classes.find(c => c.name === className);
+    if (!classObj) {
+      console.error('학급을 찾을 수 없습니다:', className);
+      alert('학급을 찾을 수 없습니다.');
+      return;
+    }
+
     const deletedItems = [
       `학급 정보 (${className})`,
       studentCount > 0 && `학생 ${studentCount}명의 모든 정보`,
@@ -1203,7 +1211,7 @@ export default function ClassTeamManagementView() {
 
     setDeleteTarget({
       type: 'class',
-      data: { className },
+      data: { className, classId: classObj.id },
       deletedItems
     });
     setShowDeleteModal(true);
@@ -1220,10 +1228,18 @@ export default function ClassTeamManagementView() {
       if (deleteTarget.type === 'student') {
         await deleteStudent(deleteTarget.data.id);
       } else if (deleteTarget.type === 'class') {
+        // 1. 해당 학급의 모든 학생 삭제
         const studentsInClass = studentsByClass[deleteTarget.data.className] || [];
         for (const student of studentsInClass) {
           await deleteStudent(student.id);
         }
+
+        // 2. 학급 자체 삭제 (classes 컬렉션에서 제거)
+        if (deleteTarget.data.classId) {
+          await deleteClass(deleteTarget.data.classId);
+        }
+
+        // 3. 선택된 학급이면 선택 해제
         if (selectedClass === deleteTarget.data.className) {
           setSelectedClass(null);
         }
