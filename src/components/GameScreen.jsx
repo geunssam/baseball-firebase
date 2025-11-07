@@ -725,67 +725,120 @@ const GameScreen = ({ gameId, onExit }) => {
       console.log(`${newInning}회 teamAConfig:`, teamAConfig);
       console.log(`${newInning}회 teamBConfig:`, teamBConfig);
 
-      if (teamAConfig || teamBConfig) {
-        console.log(`🔄 ${newInning}회 라인업 자동 교체 시작...`);
+      let needsLineupChange = false;
 
-        // 팀 A 라인업 교체
-        if (teamAConfig) {
-          const team = teams.find(t => t.id === teamAConfig.teamId);
-          if (team && team.players) {
-            const newLineup = team.players.map((player, index) => ({
-              id: player.id || player.playerId,
-              playerId: player.id || player.playerId,
-              name: player.name,
-              position: player.position || '선수',
-              battingOrder: index + 1,
-              outInInning: null,
-              badges: player.badges || [], // 배지 정보 포함
-              stats: {
-                hits: 0, single: 0, double: 0, triple: 0, homerun: 0,
-                runs: 0, bonusCookie: 0, goodDefense: 0
-              },
-              hitDetails: []
-            }));
-            updates['teamA.lineup'] = newLineup;
-            updates['teamA.id'] = team.id;       // 팀 ID 업데이트
-            updates['teamA.name'] = team.name;   // 팀 이름 업데이트
-            console.log(`✅ 팀 A 슬롯을 "${teamAConfig.teamName}"으로 교체 (ID: ${team.id})`);
-          }
+      // 팀 A 라인업 처리
+      if (teamAConfig) {
+        // inningLineups에 설정이 있으면 해당 팀으로 교체
+        const team = teams.find(t => t.id === teamAConfig.teamId);
+        if (team && team.players) {
+          const newLineup = team.players.map((player, index) => ({
+            id: player.id || player.playerId,
+            playerId: player.id || player.playerId,
+            name: player.name,
+            position: player.position || '선수',
+            battingOrder: index + 1,
+            outInInning: null,
+            badges: player.badges || [],
+            stats: {
+              hits: 0, single: 0, double: 0, triple: 0, homerun: 0,
+              runs: 0, bonusCookie: 0, goodDefense: 0
+            },
+            hitDetails: []
+          }));
+          updates['teamA.lineup'] = newLineup;
+          updates['teamA.id'] = team.id;
+          updates['teamA.name'] = team.name;
+          console.log(`✅ 팀 A 슬롯을 "${teamAConfig.teamName}"으로 교체 (ID: ${team.id})`);
+          needsLineupChange = true;
         }
-
-        // 팀 B 라인업 교체
-        if (teamBConfig) {
-          const team = teams.find(t => t.id === teamBConfig.teamId);
-          if (team && team.players) {
-            const newLineup = team.players.map((player, index) => ({
-              id: player.id || player.playerId,
-              playerId: player.id || player.playerId,
-              name: player.name,
-              position: player.position || '선수',
-              battingOrder: index + 1,
-              outInInning: null,
-              badges: player.badges || [], // 배지 정보 포함
-              stats: {
-                hits: 0, single: 0, double: 0, triple: 0, homerun: 0,
-                runs: 0, bonusCookie: 0, goodDefense: 0
-              },
-              hitDetails: []
-            }));
-            updates['teamB.lineup'] = newLineup;
-            updates['teamB.id'] = team.id;       // 팀 ID 업데이트
-            updates['teamB.name'] = team.name;   // 팀 이름 업데이트
-            console.log(`✅ 팀 B 슬롯을 "${teamBConfig.teamName}"으로 교체 (ID: ${team.id})`);
-          }
+      } else if (game.teamA.initialTeamId && game.teamA.id !== game.teamA.initialTeamId) {
+        // inningLineups에 설정이 없고, 현재 팀이 초기 팀과 다르면 초기 팀으로 복원
+        const initialTeam = teams.find(t => t.id === game.teamA.initialTeamId);
+        if (initialTeam && initialTeam.players) {
+          const newLineup = initialTeam.players.map((player, index) => ({
+            id: player.id || player.playerId,
+            playerId: player.id || player.playerId,
+            name: player.name,
+            position: player.position || '선수',
+            battingOrder: index + 1,
+            outInInning: null,
+            badges: player.badges || [],
+            stats: {
+              hits: 0, single: 0, double: 0, triple: 0, homerun: 0,
+              runs: 0, bonusCookie: 0, goodDefense: 0
+            },
+            hitDetails: []
+          }));
+          updates['teamA.lineup'] = newLineup;
+          updates['teamA.id'] = initialTeam.id;
+          updates['teamA.name'] = initialTeam.name;
+          console.log(`🔙 팀 A 슬롯을 초기 팀 "${game.teamA.initialTeamName}"으로 복원 (ID: ${initialTeam.id})`);
+          needsLineupChange = true;
         }
+      }
 
-        // 타자 인덱스 초기화
+      // 팀 B 라인업 처리
+      if (teamBConfig) {
+        // inningLineups에 설정이 있으면 해당 팀으로 교체
+        const team = teams.find(t => t.id === teamBConfig.teamId);
+        if (team && team.players) {
+          const newLineup = team.players.map((player, index) => ({
+            id: player.id || player.playerId,
+            playerId: player.id || player.playerId,
+            name: player.name,
+            position: player.position || '선수',
+            battingOrder: index + 1,
+            outInInning: null,
+            badges: player.badges || [],
+            stats: {
+              hits: 0, single: 0, double: 0, triple: 0, homerun: 0,
+              runs: 0, bonusCookie: 0, goodDefense: 0
+            },
+            hitDetails: []
+          }));
+          updates['teamB.lineup'] = newLineup;
+          updates['teamB.id'] = team.id;
+          updates['teamB.name'] = team.name;
+          console.log(`✅ 팀 B 슬롯을 "${teamBConfig.teamName}"으로 교체 (ID: ${team.id})`);
+          needsLineupChange = true;
+        }
+      } else if (game.teamB.initialTeamId && game.teamB.id !== game.teamB.initialTeamId) {
+        // inningLineups에 설정이 없고, 현재 팀이 초기 팀과 다르면 초기 팀으로 복원
+        const initialTeam = teams.find(t => t.id === game.teamB.initialTeamId);
+        if (initialTeam && initialTeam.players) {
+          const newLineup = initialTeam.players.map((player, index) => ({
+            id: player.id || player.playerId,
+            playerId: player.id || player.playerId,
+            name: player.name,
+            position: player.position || '선수',
+            battingOrder: index + 1,
+            outInInning: null,
+            badges: player.badges || [],
+            stats: {
+              hits: 0, single: 0, double: 0, triple: 0, homerun: 0,
+              runs: 0, bonusCookie: 0, goodDefense: 0
+            },
+            hitDetails: []
+          }));
+          updates['teamB.lineup'] = newLineup;
+          updates['teamB.id'] = initialTeam.id;
+          updates['teamB.name'] = initialTeam.name;
+          console.log(`🔙 팀 B 슬롯을 초기 팀 "${game.teamB.initialTeamName}"으로 복원 (ID: ${initialTeam.id})`);
+          needsLineupChange = true;
+        }
+      }
+
+      // 라인업이 변경되었으면 타자 인덱스 초기화
+      if (needsLineupChange) {
         updates.currentBatterIndex = 0;
+        console.log(`🔄 ${newInning}회 라인업 변경 완료`);
       }
 
       await updateGame(game.id, updates);
       console.log(`✅ 이닝 변경: ${newInning}회로 이동`);
 
-      if (teamAConfig || teamBConfig) {
+      if (needsLineupChange) {
         alert(`✅ ${newInning}회 라인업이 자동으로 교체되었습니다!`);
       }
     } catch (error) {

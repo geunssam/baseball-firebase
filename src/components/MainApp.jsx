@@ -414,6 +414,8 @@ const MainApp = () => {
             },
           })),
           inningLineups: inningLineups.teamA || {}, // 이닝별 라인업 설정
+          initialTeamId: teamA.id, // 초기 팀 ID (이전 이닝 복원용)
+          initialTeamName: teamA.name, // 초기 팀 이름
         },
         teamB: {
           id: teamB.id,
@@ -434,6 +436,8 @@ const MainApp = () => {
             },
           })),
           inningLineups: inningLineups.teamB || {}, // 이닝별 라인업 설정
+          initialTeamId: teamB.id, // 초기 팀 ID (이전 이닝 복원용)
+          initialTeamName: teamB.name, // 초기 팀 이름
         },
         innings,
         inningEndRule: options.inningEndRule || 'allBatters', // 'allBatters' | 'nOuts' | 'manual'
