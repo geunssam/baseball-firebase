@@ -342,7 +342,26 @@ const CreateGameModal = ({
                 <Input
                   type="number"
                   value={innings}
-                  onChange={(e) => setInnings(Math.max(1, Math.min(9, parseInt(e.target.value) || 1)))}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // 빈 값이면 그대로 유지 (입력 중)
+                    if (value === '') {
+                      setInnings('');
+                      return;
+                    }
+                    // 숫자로 변환
+                    const num = parseInt(value);
+                    // 유효한 숫자면 범위 검증 (1-9)
+                    if (!isNaN(num)) {
+                      setInnings(Math.max(1, Math.min(9, num)));
+                    }
+                  }}
+                  onBlur={(e) => {
+                    // 포커스를 잃을 때 빈 값이면 1로 설정
+                    if (e.target.value === '' || isNaN(parseInt(e.target.value))) {
+                      setInnings(1);
+                    }
+                  }}
                   min="1"
                   max="9"
                   className="w-16 text-center"

@@ -1226,28 +1226,41 @@ export default function ClassTeamManagementView() {
     setIsDeleting(true);
     try {
       if (deleteTarget.type === 'student') {
+        console.log('🗑️ 학생 삭제 시작:', deleteTarget.data.id);
         await deleteStudent(deleteTarget.data.id);
+        console.log('✅ 학생 삭제 완료');
       } else if (deleteTarget.type === 'class') {
+        console.log('🗑️ 학급 삭제 시작:', deleteTarget.data.className);
+
         // 1. 해당 학급의 모든 학생 삭제
         const studentsInClass = studentsByClass[deleteTarget.data.className] || [];
+        console.log('  📝 삭제할 학생 수:', studentsInClass.length);
         for (const student of studentsInClass) {
+          console.log('    - 학생 삭제:', student.name, student.id);
           await deleteStudent(student.id);
         }
 
         // 2. 학급 자체 삭제 (classes 컬렉션에서 제거)
         if (deleteTarget.data.classId) {
+          console.log('  🏫 학급 문서 삭제:', deleteTarget.data.classId);
           await deleteClass(deleteTarget.data.classId);
+          console.log('  ✅ 학급 문서 삭제 완료');
+        } else {
+          console.warn('  ⚠️ classId가 없습니다!');
         }
 
         // 3. 선택된 학급이면 선택 해제
         if (selectedClass === deleteTarget.data.className) {
           setSelectedClass(null);
         }
+
+        console.log('✅ 학급 삭제 완료');
       }
 
       setShowDeleteModal(false);
       setDeleteTarget(null);
     } catch (error) {
+      console.error('❌ 삭제 실패:', error);
       alert('삭제에 실패했습니다: ' + error.message);
     } finally {
       setIsDeleting(false);
