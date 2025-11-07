@@ -18,6 +18,7 @@ import RunnerAdjustmentModal from './RunnerAdjustmentModal';
 import RunnersLeftOnBaseModal from './RunnersLeftOnBaseModal';
 import BadgePopup from './BadgePopup';
 import BadgeProgressIndicator from './BadgeProgressIndicator';
+import PlayerBadgeDisplay from './PlayerBadgeDisplay';
 import InningLineupChangeModal from './InningLineupChangeModal';
 import PlayerBadgeOrderModal from './PlayerBadgeOrderModal';
 import StudentCodeListModal from './StudentCodeListModal';
@@ -180,6 +181,7 @@ const GameScreen = ({ gameId, onExit }) => {
   // 배지 시스템 상태
   const [newBadges, setNewBadges] = useState([]); // 새로 획득한 배지들
   const [showBadgePopup, setShowBadgePopup] = useState(false); // 배지 획득 팝업 표시 여부
+  const [pendingBadges, setPendingBadges] = useState(null); // 주자 모달 후 표시할 배지 (임시 저장)
   const badgePopupTimerRef = useRef(null); // 배지 팝업 자동 닫기 타이머
   const hasShownInitialBadgesRef = useRef(false); // 초기 배지 팝업 표시 여부 (중복 방지)
 
@@ -1935,8 +1937,12 @@ const GameScreen = ({ gameId, onExit }) => {
     else if (hitType === '3루타') batter.stats.triple += 1;
     else if (hitType === '홈런') batter.stats.homerun += 1;
 
-    // 안타 기록 후 배지 체크
-    checkAndAwardBadges(batter);
+    // 안타 기록 후 배지 체크 (팝업은 주자 모달 확인 후 표시)
+    const earnedBadges = await checkAndAwardBadges(batter, false); // showPopupImmediately = false
+    if (earnedBadges && earnedBadges.length > 0) {
+      console.log(`🏅 배지 획득 (표시 대기): ${earnedBadges.map(b => b.name).join(', ')}`);
+      setPendingBadges(earnedBadges);
+    }
 
     // === 주자 이동 로직 (간단한 N루타 = N루씩 전진) ===
     const currentRunners = newGame.runners || { first: null, second: null, third: null };
@@ -2015,8 +2021,9 @@ const GameScreen = ({ gameId, onExit }) => {
   /**
    * 배지 체크 및 획득 처리
    * @param {Object} player - 체크할 선수 객체
+   * @param {Boolean} showPopupImmediately - 즉시 팝업 표시 여부 (기본: true)
    */
-  const checkAndAwardBadges = async (player) => {
+  const checkAndAwardBadges = async (player, showPopupImmediately = true) => {
     if (!player) return;
 
     // 🔍 학생 실제 ID 찾기 (이름과 반으로 매칭)
@@ -2118,26 +2125,42 @@ const GameScreen = ({ gameId, onExit }) => {
         // React 재렌더링 트리거 (프로그레스 바 즉시 반영)
         setGame(prev => ({ ...prev }));
 
-        // 배지 팝업 표시 (학생 이름 포함)
+        // 배지 정보 생성
         const badgesWithPlayerName = earnedBadges.map(badge => ({
           ...badge,
           playerName: player.name
         }));
-        setNewBadges(prev => [...(prev || []), ...badgesWithPlayerName]);
-        setShowBadgePopup(true);
 
-        // 5초 후 자동 닫기 타이머 설정
-        if (badgePopupTimerRef.current) {
-          clearTimeout(badgePopupTimerRef.current);
+        // 즉시 팝업 표시 여부에 따라 분기
+        if (showPopupImmediately) {
+          // 즉시 팝업 표시 (득점, 쿠키, 수비 등)
+          console.log(`🎉 배지 획득 즉시 팝업 표시: ${badgesWithPlayerName.map(b => b.name).join(', ')}`);
+          setNewBadges(prev => [...(prev || []), ...badgesWithPlayerName]);
+          setShowBadgePopup(true);
+
+          // 5초 후 자동 닫기
+          if (badgePopupTimerRef.current) {
+            clearTimeout(badgePopupTimerRef.current);
+          }
+          badgePopupTimerRef.current = setTimeout(() => {
+            setShowBadgePopup(false);
+            setNewBadges([]);
+          }, 5000);
+
+          return []; // 즉시 표시했으므로 빈 배열 반환
+        } else {
+          // 나중에 표시 (안타 입력 시)
+          console.log(`🏅 배지 획득 완료 (표시 대기): ${badgesWithPlayerName.map(b => b.name).join(', ')}`);
+          return badgesWithPlayerName;
         }
-        badgePopupTimerRef.current = setTimeout(() => {
-          setShowBadgePopup(false);
-          setNewBadges([]);
-        }, 5000);
       } catch (error) {
         console.error(`❌ ${player.name} 배지 저장 실패:`, error);
+        return []; // 에러 시 빈 배열 반환
       }
     }
+
+    // 배지를 획득하지 못한 경우 빈 배열 반환
+    return [];
   };
 
   // 주자 조정 모달 확인 핸들러
@@ -2218,7 +2241,8 @@ const GameScreen = ({ gameId, onExit }) => {
     });
 
     // 득점한 주자들의 runs 스탯 증가 및 배지 체크
-    scoredRunners.forEach(runner => {
+    const runBadges = []; // 득점으로 획득한 배지들
+    for (const runner of scoredRunners) {
       if (runner.playerIndex !== undefined) {
         const scoredPlayer = team.lineup[runner.playerIndex];
         if (scoredPlayer && scoredPlayer.stats) {
@@ -2226,11 +2250,14 @@ const GameScreen = ({ gameId, onExit }) => {
           scoredPlayer.stats.runs = beforeRuns + 1;
           console.log(`✅ ${scoredPlayer.name} 득점 스탯 업데이트: ${beforeRuns} → ${scoredPlayer.stats.runs}`);
 
-          // 배지 체크
-          checkAndAwardBadges(scoredPlayer);
+          // 배지 체크 (팝업은 나중에)
+          const earnedBadges = await checkAndAwardBadges(scoredPlayer, false);
+          if (earnedBadges && earnedBadges.length > 0) {
+            runBadges.push(...earnedBadges);
+          }
         }
       }
-    });
+    }
 
     // 스코어보드 업데이트
     if (runsScored > 0) {
@@ -2274,6 +2301,31 @@ const GameScreen = ({ gameId, onExit }) => {
       setPendingRunners(null);
       setOriginalRunners(null);
       setCurrentBatter(null);
+
+      // ✅ 주자 모달이 닫힌 후 대기 중인 배지 팝업 표시
+      const allBadges = [
+        ...(pendingBadges || []),  // 안타로 획득한 배지
+        ...runBadges               // 득점으로 획득한 배지
+      ];
+
+      if (allBadges.length > 0) {
+        // React 상태 업데이트가 완료된 후 배지 표시 (다음 틱에 실행)
+        setTimeout(() => {
+          console.log(`🎉 배지 축하 팝업 표시: ${allBadges.length}개 (안타: ${pendingBadges?.length || 0}, 득점: ${runBadges.length})`);
+          setNewBadges(prev => [...(prev || []), ...allBadges]);
+          setShowBadgePopup(true);
+          setPendingBadges(null); // 초기화
+
+          // 5초 후 자동 닫기
+          if (badgePopupTimerRef.current) {
+            clearTimeout(badgePopupTimerRef.current);
+          }
+          badgePopupTimerRef.current = setTimeout(() => {
+            setShowBadgePopup(false);
+            setNewBadges([]);
+          }, 5000);
+        }, 0);
+      }
     } catch (error) {
       console.error('❌ 주자 상황 업데이트 실패:', error);
       alert('주자 상황 업데이트에 실패했습니다.');
@@ -2287,7 +2339,8 @@ const GameScreen = ({ gameId, onExit }) => {
     setPendingRunners(null);
     setOriginalRunners(null);
     setCurrentBatter(null);
-    console.log('주자 조정 취소');
+    setPendingBadges(null); // 대기 중인 배지도 초기화
+    console.log('주자 조정 취소 (대기 중인 배지도 초기화)');
   };
 
   // 안타 삭제 핸들러 (편집 모드)
@@ -3095,7 +3148,7 @@ const GameScreen = ({ gameId, onExit }) => {
                   <thead className="sticky top-0 bg-white z-10 shadow-sm">
                     <tr className="border-b-2 border-black">
                       <th className="text-center py-2 bg-white" style={{ textAlign: 'center' }}>타순</th>
-                      <th className="text-left py-2 pl-2 bg-white" style={{ textAlign: 'left' }}>이름</th>
+                      <th className="text-left py-2 pl-[6.5rem] bg-white" style={{ textAlign: 'left' }}>이름</th>
                       <th className="text-center py-2 bg-white" style={{ textAlign: 'center' }}>⚾ 안타</th>
                       <th className="text-center py-2 bg-white" style={{ textAlign: 'center' }}>🏃 득점</th>
                       <th className="text-center py-2 bg-white" style={{ textAlign: 'center' }}>🍪 쿠키</th>
@@ -3129,36 +3182,29 @@ const GameScreen = ({ gameId, onExit }) => {
                                 currentInning={game.currentInning}
                               >
                                 <td className="py-2 align-middle text-left pl-2">
-                                  <div className="flex items-center gap-1">
-                                    {/* 배지 영역 (최대 3개) - 왼쪽, 고정 너비 */}
-                                    <div className="flex items-center gap-0.5 w-16 flex-shrink-0">
-                                      {player.badges && player.badges.length > 0 ? (
-                                        <>
-                                          {player.badges.slice(0, 3).map((badgeId, idx) => {
-                                            const badge = Object.values(BADGES).find(b => b.id === badgeId);
-                                            return badge ? (
-                                              <span key={idx} title={badge.name} className="text-sm cursor-help">
-                                                {badge.icon}
-                                              </span>
-                                            ) : null;
-                                          })}
-                                          {player.badges.length > 3 && (
-                                            <span
-                                              className="text-xs text-gray-500 cursor-help"
-                                              title={player.badges.slice(3).map(id => {
-                                                const b = Object.values(BADGES).find(badge => badge.id === id);
-                                                return b ? `${b.icon} ${b.name}` : '';
-                                              }).filter(Boolean).join('\n')}
-                                            >
-                                              +{player.badges.length - 3}
-                                            </span>
-                                          )}
-                                        </>
-                                      ) : null}
+                                  <div className="flex items-center gap-2">
+                                    {/* 배지 영역 + 프로그레스바 - 왼쪽, 세로 배치 */}
+                                    <div className="flex flex-col gap-1 w-24 flex-shrink-0">
+                                      {/* 배지들 (최대 3개) - 동적 정렬 */}
+                                      <div className={`flex items-center gap-0.5 ${player.badges && player.badges.length >= 3 ? 'justify-start' : 'justify-center'}`}>
+                                        {player.badges && player.badges.length > 0 ? (
+                                          <PlayerBadgeDisplay
+                                            player={player}
+                                            maxBadges={3}
+                                            size="sm"
+                                            showEmpty={false}
+                                            showOverflow={true}
+                                          />
+                                        ) : null}
+                                      </div>
+                                      {/* 프로그레스바 */}
+                                      <BadgeProgressIndicator
+                                        progressData={getNextBadgesProgress(calculateLiveTotalStats(player) || player.stats || {}, player.badges || [], BADGES, true)}
+                                      />
                                     </div>
 
-                                    {/* 이름 + 진행도 - 오른쪽 */}
-                                    <div className="flex flex-col gap-1 flex-1">
+                                    {/* 이름 - 오른쪽, 세로 중앙 정렬 */}
+                                    <div className="flex items-center flex-1">
                                       <span
                                         className="font-bold cursor-pointer underline decoration-dotted decoration-gray-400 hover:decoration-solid hover:decoration-blue-600 hover:text-blue-600 transition-colors"
                                         onClick={() => handlePlayerNameClick(player)}
@@ -3166,9 +3212,6 @@ const GameScreen = ({ gameId, onExit }) => {
                                       >
                                         {player.name}
                                       </span>
-                                      <BadgeProgressIndicator
-                                        progressData={getNextBadgesProgress(calculateLiveTotalStats(player) || player.stats || {}, player.badges || [], BADGES, true)}
-                                      />
                                     </div>
                                   </div>
                                 </td>
@@ -3260,36 +3303,29 @@ const GameScreen = ({ gameId, onExit }) => {
                                   </div>
                                 </td>
                                 <td className="py-2 align-middle text-left pl-2">
-                                  <div className="flex items-center gap-1">
-                                    {/* 배지 영역 (최대 3개) - 왼쪽, 고정 너비 */}
-                                    <div className="flex items-center gap-0.5 w-16 flex-shrink-0">
-                                      {player.badges && player.badges.length > 0 ? (
-                                        <>
-                                          {player.badges.slice(0, 3).map((badgeId, idx) => {
-                                            const badge = Object.values(BADGES).find(b => b.id === badgeId);
-                                            return badge ? (
-                                              <span key={idx} title={badge.name} className="text-sm cursor-help">
-                                                {badge.icon}
-                                              </span>
-                                            ) : null;
-                                          })}
-                                          {player.badges.length > 3 && (
-                                            <span
-                                              className="text-xs text-gray-500 cursor-help"
-                                              title={player.badges.slice(3).map(id => {
-                                                const b = Object.values(BADGES).find(badge => badge.id === id);
-                                                return b ? `${b.icon} ${b.name}` : '';
-                                              }).filter(Boolean).join('\n')}
-                                            >
-                                              +{player.badges.length - 3}
-                                            </span>
-                                          )}
-                                        </>
-                                      ) : null}
+                                  <div className="flex items-center gap-2">
+                                    {/* 배지 영역 + 프로그레스바 - 왼쪽, 세로 배치 */}
+                                    <div className="flex flex-col gap-1 w-24 flex-shrink-0">
+                                      {/* 배지들 (최대 3개) - 동적 정렬 */}
+                                      <div className={`flex items-center gap-0.5 ${player.badges && player.badges.length >= 3 ? 'justify-start' : 'justify-center'}`}>
+                                        {player.badges && player.badges.length > 0 ? (
+                                          <PlayerBadgeDisplay
+                                            player={player}
+                                            maxBadges={3}
+                                            size="sm"
+                                            showEmpty={false}
+                                            showOverflow={true}
+                                          />
+                                        ) : null}
+                                      </div>
+                                      {/* 프로그레스바 */}
+                                      <BadgeProgressIndicator
+                                        progressData={getNextBadgesProgress(calculateLiveTotalStats(player) || player.stats || {}, player.badges || [], BADGES, true)}
+                                      />
                                     </div>
 
-                                    {/* 이름 + 진행도 - 오른쪽 */}
-                                    <div className="flex flex-col gap-1 flex-1">
+                                    {/* 이름 - 오른쪽, 세로 중앙 정렬 */}
+                                    <div className="flex items-center flex-1">
                                       <span
                                         className="font-bold cursor-pointer underline decoration-dotted decoration-gray-400 hover:decoration-solid hover:decoration-blue-600 hover:text-blue-600 transition-colors"
                                         onClick={() => handlePlayerNameClick(player)}
@@ -3297,9 +3333,6 @@ const GameScreen = ({ gameId, onExit }) => {
                                       >
                                         {player.name}
                                       </span>
-                                      <BadgeProgressIndicator
-                                        progressData={getNextBadgesProgress(calculateLiveTotalStats(player) || player.stats || {}, player.badges || [], BADGES, true)}
-                                      />
                                     </div>
                                   </div>
                                 </td>
@@ -3551,7 +3584,7 @@ const GameScreen = ({ gameId, onExit }) => {
                   <thead className="sticky top-0 bg-white z-10 shadow-sm">
                     <tr className="border-b-2 border-black">
                       <th className="text-center py-2 bg-white">포지션</th>
-                      <th className="text-center py-2 bg-white">이름</th>
+                      <th className="text-left py-2 pl-[6.5rem] bg-white">이름</th>
                       <th className="text-center py-2 bg-white">🛡️ 수비</th>
                       <th className="text-center py-2 bg-white">🍪 쿠키</th>
                       {isDefenseEditMode && (
@@ -3616,36 +3649,27 @@ const GameScreen = ({ gameId, onExit }) => {
                           )}
                         </td>
                         <td className="py-2 align-middle text-left pl-2">
-                          <div className="flex items-center gap-1">
-                            {/* 배지 영역 (최대 3개) - 왼쪽, 고정 너비 */}
-                            <div className="flex items-center gap-0.5 w-16 flex-shrink-0">
-                              {player.badges && player.badges.length > 0 ? (
-                                <>
-                                  {player.badges.slice(0, 3).map((badgeId, idx) => {
-                                    const badge = Object.values(BADGES).find(b => b.id === badgeId);
-                                    return badge ? (
-                                      <span key={idx} title={badge.name} className="text-sm cursor-help">
-                                        {badge.icon}
-                                      </span>
-                                    ) : null;
-                                  })}
-                                  {player.badges.length > 3 && (
-                                    <span
-                                      className="text-xs text-gray-500 cursor-help"
-                                      title={player.badges.slice(3).map(id => {
-                                        const b = Object.values(BADGES).find(badge => badge.id === id);
-                                        return b ? `${b.icon} ${b.name}` : '';
-                                      }).filter(Boolean).join('\n')}
-                                    >
-                                      +{player.badges.length - 3}
-                                    </span>
-                                  )}
-                                </>
-                              ) : null}
+                          <div className="flex items-center gap-2">
+                            {/* 배지 영역 + 프로그레스바 - 왼쪽, 세로 배치 */}
+                            <div className="flex flex-col gap-1 w-24 flex-shrink-0">
+                              {/* 배지들 (최대 3개) - 동적 정렬 */}
+                              <div className={`flex items-center gap-0.5 ${player.badges && player.badges.length >= 3 ? 'justify-start' : 'justify-center'}`}>
+                                <PlayerBadgeDisplay
+                                  player={player}
+                                  maxBadges={3}
+                                  size="sm"
+                                  showEmpty={false}
+                                  showOverflow={true}
+                                />
+                              </div>
+                              {/* 프로그레스바 */}
+                              <BadgeProgressIndicator
+                                progressData={getNextBadgesProgress(calculateLiveTotalStats(player) || player.stats || {}, player.badges || [], BADGES, true)}
+                              />
                             </div>
 
-                            {/* 이름 + 진행도 - 오른쪽 */}
-                            <div className="flex flex-col gap-1 flex-1">
+                            {/* 이름 - 오른쪽, 세로 중앙 정렬 */}
+                            <div className="flex items-center flex-1">
                               <span
                                 className="font-bold cursor-pointer underline decoration-dotted decoration-gray-400 hover:decoration-solid hover:decoration-blue-600 hover:text-blue-600 transition-colors"
                                 onClick={() => handlePlayerNameClick(player)}
@@ -3653,9 +3677,6 @@ const GameScreen = ({ gameId, onExit }) => {
                               >
                                 {player.name}
                               </span>
-                              <BadgeProgressIndicator
-                                progressData={getNextBadgesProgress(calculateLiveTotalStats(player) || player.stats || {}, player.badges || [], BADGES, true)}
-                              />
                             </div>
                           </div>
                         </td>

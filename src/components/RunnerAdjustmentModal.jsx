@@ -139,7 +139,14 @@ const RunnerAdjustmentModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent
+        className="max-w-lg"
+        onInteractOutside={(e) => {
+          // backdrop 클릭 방지 (주자 상황은 반드시 확인 또는 취소 버튼으로만 닫아야 함)
+          e.preventDefault();
+          console.warn('⚠️ 주자 모달: backdrop 클릭 차단 (확인/취소 버튼 사용)');
+        }}
+      >
         {/* 헤더 */}
         <DialogHeader className="pb-2">
           <DialogTitle className="text-3xl font-bold text-center">⚾ 주자 상황 조정</DialogTitle>

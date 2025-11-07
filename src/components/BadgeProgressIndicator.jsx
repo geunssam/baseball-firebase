@@ -66,7 +66,7 @@ const BadgeProgressIndicator = ({ progressData, showEmpty = false }) => {
         <span className="text-sm opacity-50">{topProgress.badge.icon}</span>
 
         {/* 진행도 바 */}
-        <div className="flex-1 min-w-[30px] max-w-[50px]">
+        <div className="flex-1 min-w-[30px] max-w-[40px]">
           <div className="bg-gray-200 rounded-full h-1.5 overflow-hidden">
             <div
               className="bg-gradient-to-r from-yellow-400 to-orange-400 h-full transition-all duration-300"
