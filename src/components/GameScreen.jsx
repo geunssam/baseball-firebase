@@ -3085,11 +3085,12 @@ const GameScreen = ({ gameId, onExit }) => {
               <div className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100% - 0px)' }}>
               <table className="w-full text-sm table-fixed">
                   <colgroup>
-                    <col style={{ width: '12%' }} />
-                    <col style={{ width: '28%' }} />
-                    <col style={{ width: '20%' }} />
-                    <col style={{ width: '20%' }} />
-                    <col style={{ width: '20%' }} />
+                    <col style={{ width: isAttackEditMode ? '10%' : '12%' }} />
+                    <col style={{ width: isAttackEditMode ? '25%' : '28%' }} />
+                    <col style={{ width: isAttackEditMode ? '17%' : '20%' }} />
+                    <col style={{ width: isAttackEditMode ? '17%' : '20%' }} />
+                    <col style={{ width: isAttackEditMode ? '17%' : '20%' }} />
+                    {isAttackEditMode && <col style={{ width: '14%' }} />}
                   </colgroup>
                   <thead className="sticky top-0 bg-white z-10 shadow-sm">
                     <tr className="border-b-2 border-black">
@@ -3098,6 +3099,9 @@ const GameScreen = ({ gameId, onExit }) => {
                       <th className="text-center py-2 bg-white" style={{ textAlign: 'center' }}>⚾ 안타</th>
                       <th className="text-center py-2 bg-white" style={{ textAlign: 'center' }}>🏃 득점</th>
                       <th className="text-center py-2 bg-white" style={{ textAlign: 'center' }}>🍪 쿠키</th>
+                      {isAttackEditMode && (
+                        <th className="text-center py-2 bg-white" style={{ textAlign: 'center' }}>관리</th>
+                      )}
                     </tr>
                   </thead>
                   <DndContext
@@ -3166,33 +3170,6 @@ const GameScreen = ({ gameId, onExit }) => {
                                         progressData={getNextBadgesProgress(calculateLiveTotalStats(player) || player.stats || {}, player.badges || [], BADGES, true)}
                                       />
                                     </div>
-
-                                    {/* 편집 모드: 교체 + 삭제 버튼 */}
-                                    <div className="flex gap-1">
-                                      <button
-                                        onClick={() => {
-                                          setReplacingPlayerIndex(i);
-                                          setReplacingTeam('attack');
-                                          setShowPlayerReplaceModal(true);
-                                        }}
-                                        className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-0.5 rounded transition"
-                                        title="선수 교체"
-                                      >
-                                        교체
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteAttackPlayer(i)}
-                                        disabled={tempAttackLineup.length <= 1}
-                                        className={`text-xs px-2 py-0.5 rounded transition ${
-                                          tempAttackLineup.length <= 1
-                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                            : 'bg-red-100 hover:bg-red-200 text-red-700'
-                                        }`}
-                                        title={tempAttackLineup.length <= 1 ? '최소 1명은 남아있어야 합니다' : '선수 삭제'}
-                                      >
-                                        삭제
-                                      </button>
-                                    </div>
                                   </div>
                                 </td>
 
@@ -3211,6 +3188,35 @@ const GameScreen = ({ gameId, onExit }) => {
                                   <span className="inline-flex items-center gap-1 text-sm px-3 py-1 rounded-full bg-yellow-50 border border-yellow-200 text-yellow-800 font-bold">
                                     쿠키 <span className="font-extrabold text-base">{player.stats?.bonusCookie || 0}</span>
                                   </span>
+                                </td>
+
+                                {/* 편집 모드: 관리 버튼 (교체 + 삭제) */}
+                                <td className="text-center py-2 align-middle">
+                                  <div className="flex gap-1 justify-center">
+                                    <button
+                                      onClick={() => {
+                                        setReplacingPlayerIndex(i);
+                                        setReplacingTeam('attack');
+                                        setShowPlayerReplaceModal(true);
+                                      }}
+                                      className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-0.5 rounded transition"
+                                      title="선수 교체"
+                                    >
+                                      교체
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteAttackPlayer(i)}
+                                      disabled={tempAttackLineup.length <= 1}
+                                      className={`text-xs px-2 py-0.5 rounded transition ${
+                                        tempAttackLineup.length <= 1
+                                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                          : 'bg-red-100 hover:bg-red-200 text-red-700'
+                                      }`}
+                                      title={tempAttackLineup.length <= 1 ? '최소 1명은 남아있어야 합니다' : '선수 삭제'}
+                                    >
+                                      삭제
+                                    </button>
+                                  </div>
                                 </td>
                               </SortableAttackRow>
                             );
@@ -3536,10 +3542,11 @@ const GameScreen = ({ gameId, onExit }) => {
               <div className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100% - 0px)' }}>
               <table className="w-full text-sm table-fixed">
                   <colgroup>
-                    <col style={{ width: '18%' }} />
-                    <col style={{ width: '32%' }} />
-                    <col style={{ width: '25%' }} />
-                    <col style={{ width: '25%' }} />
+                    <col style={{ width: isDefenseEditMode ? '16%' : '18%' }} />
+                    <col style={{ width: isDefenseEditMode ? '28%' : '32%' }} />
+                    <col style={{ width: isDefenseEditMode ? '20%' : '25%' }} />
+                    <col style={{ width: isDefenseEditMode ? '20%' : '25%' }} />
+                    {isDefenseEditMode && <col style={{ width: '16%' }} />}
                   </colgroup>
                   <thead className="sticky top-0 bg-white z-10 shadow-sm">
                     <tr className="border-b-2 border-black">
@@ -3547,6 +3554,9 @@ const GameScreen = ({ gameId, onExit }) => {
                       <th className="text-center py-2 bg-white">이름</th>
                       <th className="text-center py-2 bg-white">🛡️ 수비</th>
                       <th className="text-center py-2 bg-white">🍪 쿠키</th>
+                      {isDefenseEditMode && (
+                        <th className="text-center py-2 bg-white">관리</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -3647,35 +3657,6 @@ const GameScreen = ({ gameId, onExit }) => {
                                 progressData={getNextBadgesProgress(calculateLiveTotalStats(player) || player.stats || {}, player.badges || [], BADGES, true)}
                               />
                             </div>
-
-                            {/* 편집 모드일 때만 교체 + 삭제 버튼 표시 */}
-                            {isDefenseEditMode && (
-                              <div className="flex gap-1">
-                                <button
-                                  onClick={() => {
-                                    setReplacingPlayerIndex(i);
-                                    setReplacingTeam('defense');
-                                    setShowPlayerReplaceModal(true);
-                                  }}
-                                  className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-0.5 rounded transition"
-                                  title="선수 교체"
-                                >
-                                  교체
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteDefensePlayer(i)}
-                                  disabled={tempDefenseLineup.length <= 1}
-                                  className={`text-xs px-2 py-0.5 rounded transition ${
-                                    tempDefenseLineup.length <= 1
-                                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                      : 'bg-red-100 hover:bg-red-200 text-red-700'
-                                  }`}
-                                  title={tempDefenseLineup.length <= 1 ? '최소 1명은 남아있어야 합니다' : '선수 삭제'}
-                                >
-                                  삭제
-                                </button>
-                              </div>
-                            )}
                           </div>
                         </td>
 
@@ -3771,6 +3752,37 @@ const GameScreen = ({ gameId, onExit }) => {
                             </div>
                           )}
                         </td>
+
+                        {/* 편집 모드: 관리 버튼 (교체 + 삭제) */}
+                        {isDefenseEditMode && (
+                          <td className="text-center py-2 align-middle">
+                            <div className="flex gap-1 justify-center">
+                              <button
+                                onClick={() => {
+                                  setReplacingPlayerIndex(i);
+                                  setReplacingTeam('defense');
+                                  setShowPlayerReplaceModal(true);
+                                }}
+                                className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-0.5 rounded transition"
+                                title="선수 교체"
+                              >
+                                교체
+                              </button>
+                              <button
+                                onClick={() => handleDeleteDefensePlayer(i)}
+                                disabled={tempDefenseLineup.length <= 1}
+                                className={`text-xs px-2 py-0.5 rounded transition ${
+                                  tempDefenseLineup.length <= 1
+                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                    : 'bg-red-100 hover:bg-red-200 text-red-700'
+                                }`}
+                                title={tempDefenseLineup.length <= 1 ? '최소 1명은 남아있어야 합니다' : '선수 삭제'}
+                              >
+                                삭제
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
