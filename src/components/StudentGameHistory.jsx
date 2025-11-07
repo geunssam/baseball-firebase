@@ -93,7 +93,9 @@ export default function StudentGameHistory({ playerId, teacherId }) {
     <div className="bg-white rounded-lg shadow p-6">
       {/* 헤더 */}
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-3xl font-bold">⚾ 나의 경기 기록</h2>
+        <div className="bg-gradient-to-r from-blue-100 to-cyan-100 px-4 py-2 rounded-lg">
+          <h2 className="text-3xl font-bold text-black">⚾ 나의 경기 기록</h2>
+        </div>
         <div className="flex gap-2 items-center">
           <select
             value={sortOrder}
@@ -105,7 +107,7 @@ export default function StudentGameHistory({ playerId, teacherId }) {
           </select>
           <button
             onClick={() => setShowDetailModal(true)}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 text-base"
+            className="px-4 py-2 bg-sky-100 hover:bg-sky-200 text-black rounded-lg transition-colors flex items-center gap-2 text-base font-bold"
             title="상세 통계 보기"
           >
             🔍 상세 통계
@@ -316,7 +318,9 @@ function StatsDetailModal({ games, onClose }) {
       <div className="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
         {/* 헤더 */}
         <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-          <h3 className="text-2xl font-bold">📊 상세 통계 분석</h3>
+          <div className="bg-gradient-to-r from-blue-100 to-cyan-100 px-4 py-2 rounded-lg">
+            <h3 className="text-2xl font-bold text-black">📊 상세 통계 분석</h3>
+          </div>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
@@ -444,7 +448,7 @@ function StatsDetailModal({ games, onClose }) {
         <div className="sticky bottom-0 bg-gray-50 border-t px-6 py-4 flex justify-end">
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-black rounded-lg transition-colors font-bold"
           >
             닫기
           </button>

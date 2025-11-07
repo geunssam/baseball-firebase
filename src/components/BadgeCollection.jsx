@@ -40,10 +40,21 @@ const BadgeCollection = ({ onBack, customBadges = [], hiddenBadges = [] }) => {
 
     // playerBadges에서 배지 정보 가져오기
     playerBadges.forEach((playerBadge) => {
-      if (playerBadge.badges && playerBadge.badges.length > 0) {
-        const playerId = playerBadge.playerId || playerBadge.id;
+      const playerId = playerBadge.playerId || playerBadge.id;
+
+      // 새 구조 (badgeDetails) 우선, 없으면 구 구조 (badges) 사용
+      if (playerBadge.badgeDetails && playerBadge.badgeDetails.length > 0) {
         stats[playerId] = {
-          badges: playerBadge.badges
+          badgeDetails: playerBadge.badgeDetails
+        };
+      } else if (playerBadge.badges && playerBadge.badges.length > 0) {
+        // 구 구조 호환성 유지
+        stats[playerId] = {
+          badgeDetails: playerBadge.badges.map(badgeId => ({
+            badgeId,
+            awardedAt: null,
+            awardType: 'unknown'
+          }))
         };
       }
     });
@@ -297,8 +308,8 @@ const BadgeCollection = ({ onBack, customBadges = [], hiddenBadges = [] }) => {
         </TabsList>
 
         {/* 전체 탭 */}
-        <TabsContent value="ALL" className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
-          <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        <TabsContent value="ALL" className="flex-1 w-full max-w-full overflow-y-auto px-4 pt-4 pb-12 mt-0 min-h-0">
+          <div className="w-full max-w-full grid grid-cols-5 gap-x-4 gap-y-6">
             {[...Object.values(BADGES), ...customBadges].filter(b => !hiddenBadges.includes(b.id)).map(badge => (
               <BadgeCard key={badge.id} badge={badge} />
             ))}
@@ -306,8 +317,8 @@ const BadgeCollection = ({ onBack, customBadges = [], hiddenBadges = [] }) => {
         </TabsContent>
 
         {/* 입문 탭 */}
-        <TabsContent value={String(BADGE_TIERS.BEGINNER)} className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
-          <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        <TabsContent value={String(BADGE_TIERS.BEGINNER)} className="flex-1 w-full max-w-full overflow-y-auto px-4 pt-4 pb-12 mt-0 min-h-0">
+          <div className="w-full max-w-full grid grid-cols-5 gap-x-4 gap-y-6">
             {[...Object.values(BADGES), ...customBadges].filter(b => b.tier === BADGE_TIERS.BEGINNER && !hiddenBadges.includes(b.id)).map(badge => (
               <BadgeCard key={badge.id} badge={badge} />
             ))}
@@ -315,8 +326,8 @@ const BadgeCollection = ({ onBack, customBadges = [], hiddenBadges = [] }) => {
         </TabsContent>
 
         {/* 숙련 탭 */}
-        <TabsContent value={String(BADGE_TIERS.SKILLED)} className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
-          <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        <TabsContent value={String(BADGE_TIERS.SKILLED)} className="flex-1 w-full max-w-full overflow-y-auto px-4 pt-4 pb-12 mt-0 min-h-0">
+          <div className="w-full max-w-full grid grid-cols-5 gap-x-4 gap-y-6">
             {[...Object.values(BADGES), ...customBadges].filter(b => b.tier === BADGE_TIERS.SKILLED && !hiddenBadges.includes(b.id)).map(badge => (
               <BadgeCard key={badge.id} badge={badge} />
             ))}
@@ -324,8 +335,8 @@ const BadgeCollection = ({ onBack, customBadges = [], hiddenBadges = [] }) => {
         </TabsContent>
 
         {/* 마스터 탭 */}
-        <TabsContent value={String(BADGE_TIERS.MASTER)} className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
-          <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        <TabsContent value={String(BADGE_TIERS.MASTER)} className="flex-1 w-full max-w-full overflow-y-auto px-4 pt-4 pb-12 mt-0 min-h-0">
+          <div className="w-full max-w-full grid grid-cols-5 gap-x-4 gap-y-6">
             {[...Object.values(BADGES), ...customBadges].filter(b => b.tier === BADGE_TIERS.MASTER && !hiddenBadges.includes(b.id)).map(badge => (
               <BadgeCard key={badge.id} badge={badge} />
             ))}
@@ -333,8 +344,8 @@ const BadgeCollection = ({ onBack, customBadges = [], hiddenBadges = [] }) => {
         </TabsContent>
 
         {/* 레전드 탭 */}
-        <TabsContent value={String(BADGE_TIERS.LEGEND)} className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
-          <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        <TabsContent value={String(BADGE_TIERS.LEGEND)} className="flex-1 w-full max-w-full overflow-y-auto px-4 pt-4 pb-12 mt-0 min-h-0">
+          <div className="w-full max-w-full grid grid-cols-5 gap-x-4 gap-y-6">
             {[...Object.values(BADGES), ...customBadges].filter(b => b.tier === BADGE_TIERS.LEGEND && !hiddenBadges.includes(b.id)).map(badge => (
               <BadgeCard key={badge.id} badge={badge} />
             ))}
@@ -342,8 +353,8 @@ const BadgeCollection = ({ onBack, customBadges = [], hiddenBadges = [] }) => {
         </TabsContent>
 
         {/* 특별 탭 */}
-        <TabsContent value={String(BADGE_TIERS.SPECIAL)} className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
-          <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        <TabsContent value={String(BADGE_TIERS.SPECIAL)} className="flex-1 w-full max-w-full overflow-y-auto px-4 pt-4 pb-12 mt-0 min-h-0">
+          <div className="w-full max-w-full grid grid-cols-5 gap-x-4 gap-y-6">
             {[...Object.values(BADGES), ...customBadges].filter(b => b.tier === BADGE_TIERS.SPECIAL && !hiddenBadges.includes(b.id)).map(badge => (
               <BadgeCard key={badge.id} badge={badge} />
             ))}
@@ -351,7 +362,7 @@ const BadgeCollection = ({ onBack, customBadges = [], hiddenBadges = [] }) => {
         </TabsContent>
 
         {/* 커스텀 탭 */}
-        <TabsContent value="CUSTOM" className="flex-1 w-full max-w-full overflow-y-auto p-4 mt-0 min-h-0">
+        <TabsContent value="CUSTOM" className="flex-1 w-full max-w-full overflow-y-auto px-4 pt-4 pb-12 mt-0 min-h-0">
           {customBadges.filter(b => !hiddenBadges.includes(b.id)).length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <p className="text-5xl mb-4">📦</p>
@@ -359,7 +370,7 @@ const BadgeCollection = ({ onBack, customBadges = [], hiddenBadges = [] }) => {
               <p className="text-sm">배지 관리에서 커스텀 배지를 만들어보세요!</p>
             </div>
           ) : (
-            <div className="w-full max-w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            <div className="w-full max-w-full grid grid-cols-5 gap-x-4 gap-y-6">
               {customBadges.filter(b => !hiddenBadges.includes(b.id)).map(badge => (
                 <BadgeCard key={badge.id} badge={badge} />
               ))}
@@ -404,43 +415,41 @@ const BadgeCollection = ({ onBack, customBadges = [], hiddenBadges = [] }) => {
                     return groups;
                   }, {})
                 ).map(([className, classStudents]) => (
-                  <div key={className}>
+                  <div key={className} className="mb-6">
                     {/* 반 이름 헤더 */}
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="text-sm font-semibold text-primary">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="text-base font-bold text-black">
                         {className}
                       </div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-sm text-muted-foreground">
                         ({classStudents.length}명)
                       </div>
                       <div className="flex-1 border-b border-muted" />
                     </div>
 
-                    {/* 반별 학생 목록 */}
-                    <div className="space-y-2 mb-4">
-                      {classStudents.map((student, index) => (
+                    {/* 반별 학생 목록 - 4열 그리드 */}
+                    <div className="grid grid-cols-4 gap-3">
+                      {classStudents.map((student) => (
                         <Card key={student.id} className="p-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                                {index + 1}
-                              </div>
-                              <div className="font-semibold">{student.name}</div>
+                          <div className="flex items-center justify-between gap-3">
+                            {/* 학생 이름 */}
+                            <div className="font-semibold text-sm min-w-[60px]">{student.name}</div>
+
+                            {/* 획득 날짜 및 시간 */}
+                            <div className="text-xs text-muted-foreground flex-1 text-center">
+                              {student.acquiredAt}
                             </div>
-                            <div className="flex items-center gap-3">
-                              <div className="text-xs text-muted-foreground">
-                                {student.acquiredAt}
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteBadge(student, selectedBadge.id)}
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                title="배지 삭제"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
+
+                            {/* 삭제 버튼 */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteBadge(student, selectedBadge.id)}
+                              className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
+                              title="배지 삭제"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
                           </div>
                         </Card>
                       ))}

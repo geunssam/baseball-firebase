@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useGame } from '../contexts/GameContext';
 import { useAuth } from '../contexts/AuthContext';
-import firestoreService from '../services/firestoreService';
+import firestoreService, { awardCookie } from '../services/firestoreService';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -22,6 +22,7 @@ import InningLineupChangeModal from './InningLineupChangeModal';
 import PlayerBadgeOrderModal from './PlayerBadgeOrderModal';
 import StudentCodeListModal from './StudentCodeListModal';
 import GameEndModal from './GameEndModal';
+import CookieAwardModal from './CookieAwardModal';
 import { checkNewBadges, calculatePlayerTotalStats, BADGES } from '../utils/badgeSystem';
 import { getNextBadgesProgress } from '../utils/badgeProgress';
 import {
@@ -202,6 +203,10 @@ const GameScreen = ({ gameId, onExit }) => {
   const [canEditGame, setCanEditGame] = useState(true); // 기본값 true (소유자인 경우)
   const [teamAPermission, setTeamAPermission] = useState(null); // 팀A 권한 정보
   const [teamBPermission, setTeamBPermission] = useState(null); // 팀B 권한 정보
+
+  // 쿠키 수여 모달 상태
+  const [showCookieModal, setShowCookieModal] = useState(false);
+  const [selectedPlayerForCookie, setSelectedPlayerForCookie] = useState(null); // { player, isTeamA, playerIndex }
 
   // ✅ 선수 ID로 최신 선수 정보 동적 조회 (game 상태가 업데이트되면 자동으로 최신 값 반영)
   const getPlayerById = (playerId) => {
@@ -1554,6 +1559,29 @@ const GameScreen = ({ gameId, onExit }) => {
     } catch (error) {
       console.error('❌ 스탯 업데이트 실패:', error);
       alert('스탯 업데이트에 실패했습니다.');
+    }
+  };
+
+  // 쿠키 수여 핸들러
+  const handleAwardCookie = async (awardData) => {
+    try {
+      // 쿠키 수여 기록 저장 (설정 페이지의 쿠키 관리에 표시됨)
+      await awardCookie(awardData);
+
+      // 경기 중인 선수의 bonusCookie 스탯도 업데이트
+      if (selectedPlayerForCookie) {
+        await handleUpdatePlayerStat(
+          selectedPlayerForCookie.isTeamA,
+          selectedPlayerForCookie.playerIndex,
+          'bonusCookie',
+          awardData.amount
+        );
+      }
+
+      console.log(`✅ ${awardData.studentName}에게 쿠키 ${awardData.amount}개 수여 완료`);
+    } catch (error) {
+      console.error('❌ 쿠키 수여 실패:', error);
+      alert('❌ 쿠키 수여에 실패했습니다: ' + error.message);
     }
   };
 
@@ -3072,7 +3100,15 @@ const GameScreen = ({ gameId, onExit }) => {
                                       -
                                     </button>
                                     <button
-                                      onClick={() => handleUpdatePlayerStat(game.isTopInning, i, 'bonusCookie', 1)}
+                                      onClick={() => {
+                                        // 쿠키 수여 모달 열기
+                                        setSelectedPlayerForCookie({
+                                          player: player,
+                                          isTeamA: game.isTopInning,
+                                          playerIndex: i
+                                        });
+                                        setShowCookieModal(true);
+                                      }}
                                       disabled={isCompleted}
                                       className={`px-2 h-7 rounded-r text-xs font-bold min-w-[40px] ${
                                         isCompleted
@@ -3370,9 +3406,14 @@ const GameScreen = ({ gameId, onExit }) => {
                               </button>
                               <button
                                 onClick={() => {
-                                  // 수비팀은 공격팀의 반대편
+                                  // 쿠키 수여 모달 열기 (수비팀은 공격팀의 반대편)
                                   const isDefenseTeamA = !game.isTopInning;
-                                  handleUpdatePlayerStat(isDefenseTeamA, i, 'bonusCookie', 1);
+                                  setSelectedPlayerForCookie({
+                                    player: player,
+                                    isTeamA: isDefenseTeamA,
+                                    playerIndex: i
+                                  });
+                                  setShowCookieModal(true);
                                 }}
                                 disabled={isCompleted}
                                 className={`px-2 h-7 rounded-r text-xs font-bold min-w-[40px] ${
@@ -3625,6 +3666,20 @@ const GameScreen = ({ gameId, onExit }) => {
           onExit?.();
         }}
         gameData={gameEndData}
+      />
+
+      {/* 쿠키 수여 모달 */}
+      <CookieAwardModal
+        open={showCookieModal}
+        onOpenChange={setShowCookieModal}
+        students={teams.flatMap(team => team.players || [])}
+        onAwardCookie={handleAwardCookie}
+        preSelectedStudent={selectedPlayerForCookie ? {
+          id: selectedPlayerForCookie.player.id,
+          name: selectedPlayerForCookie.player.name,
+          className: selectedPlayerForCookie.player.className || '알 수 없음',
+          number: selectedPlayerForCookie.player.battingOrder || selectedPlayerForCookie.playerIndex + 1
+        } : null}
       />
     </div>
   );

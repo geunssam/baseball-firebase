@@ -3,6 +3,7 @@ import { calculateMVPScore } from '../utils/mvpCalculator';
 import { calculatePlayerPoints } from '../utils/statsHelpers';
 import SelectedGamesModal from './SelectedGamesModal';
 import PlayerBadgeDisplay from './PlayerBadgeDisplay';
+import { BADGES } from '../utils/badgeSystem';
 
 const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
   const [statsSubTab, setStatsSubTab] = useState('scoreboard');
@@ -163,25 +164,25 @@ const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
                           <span className="text-gray-300 w-6 text-center text-2xl">|</span>
 
                           {/* 날짜 */}
-                          <span className="text-gray-700 flex items-center justify-center gap-2 w-44 font-semibold">
+                          <span className="text-gray-700 flex items-center justify-center gap-2 w-48 font-semibold">
                             <span className="text-2xl">📅</span>
-                            <span className="text-center">{gameDate.toLocaleDateString('ko-KR')}</span>
+                            <span className="text-center whitespace-nowrap">{gameDate.toLocaleDateString('ko-KR')}</span>
                           </span>
 
                           <span className="text-gray-300 w-6 text-center text-2xl">|</span>
 
                           {/* 시간 */}
-                          <span className="text-gray-700 flex items-center justify-center gap-2 w-36 font-semibold">
+                          <span className="text-gray-700 flex items-center justify-center gap-2 w-32 font-semibold">
                             <span className="text-2xl">🕐</span>
-                            <span className="text-center">{gameDate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span className="text-center whitespace-nowrap">{gameDate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span>
                           </span>
 
                           <span className="text-gray-300 w-6 text-center text-2xl">|</span>
 
                           {/* 이닝 */}
-                          <span className="text-gray-700 flex items-center justify-center gap-2 w-32 font-semibold">
+                          <span className="text-gray-700 flex items-center justify-center gap-2 w-24 font-semibold">
                             <span className="text-2xl">⚾</span>
-                            <span className="text-center">{game.innings || 3}이닝</span>
+                            <span className="text-center whitespace-nowrap">{game.innings || 3}이닝</span>
                           </span>
 
                           {/* 돋보기 아이콘 - 우측 끝 */}
@@ -278,14 +279,14 @@ const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {game.teamA?.lineup?.sort((a, b) => (a.battingOrder || 999) - (b.battingOrder || 999)).map((player, idx) => (
+                                    {(game.teamA?.players || game.teamA?.lineup || []).sort((a, b) => (a.battingOrder || 999) - (b.battingOrder || 999)).map((player, idx) => (
                                       <tr key={idx} className="hover:bg-blue-50/50">
                                         <td className="border-2 border-gray-300 p-4 text-center">
                                           <div className="flex justify-center">
                                             <PlayerBadgeDisplay
                                               player={player}
                                               maxBadges={3}
-                                              size="sm"
+                                              size="lg"
                                               showEmpty={false}
                                               showOverflow={true}
                                             />
@@ -298,17 +299,15 @@ const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
                                         <td className="border-2 border-gray-300 p-4 text-center font-bold text-amber-600">{player.stats?.goodDefense || 0}</td>
                                         <td className="border-2 border-gray-300 p-4 text-center font-bold text-purple-600">{player.stats?.bonusCookie || 0}</td>
                                         <td className="border-2 border-gray-300 p-4 text-center">
-                                          {player.newBadges && player.newBadges.length > 0 ? (
-                                            <div className="flex flex-wrap gap-1 justify-center">
-                                              {player.newBadges.map((badge, bidx) => (
-                                                <span key={bidx} className="text-2xl" title={badge.name}>
-                                                  {badge.emoji}
-                                                </span>
-                                              ))}
-                                            </div>
-                                          ) : (
-                                            <span className="text-gray-400">-</span>
-                                          )}
+                                          <div className="flex justify-center">
+                                            <PlayerBadgeDisplay
+                                              player={{ badges: player.newBadges }}
+                                              maxBadges={5}
+                                              size="lg"
+                                              showEmpty={false}
+                                              showOverflow={true}
+                                            />
+                                          </div>
                                         </td>
                                       </tr>
                                     ))}
@@ -337,14 +336,14 @@ const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {game.teamB?.lineup?.sort((a, b) => (a.battingOrder || 999) - (b.battingOrder || 999)).map((player, idx) => (
+                                    {(game.teamB?.players || game.teamB?.lineup || []).sort((a, b) => (a.battingOrder || 999) - (b.battingOrder || 999)).map((player, idx) => (
                                       <tr key={idx} className="hover:bg-red-50/50">
                                         <td className="border-2 border-gray-300 p-4 text-center">
                                           <div className="flex justify-center">
                                             <PlayerBadgeDisplay
                                               player={player}
                                               maxBadges={3}
-                                              size="sm"
+                                              size="lg"
                                               showEmpty={false}
                                               showOverflow={true}
                                             />
@@ -357,17 +356,15 @@ const StatsView = ({ finishedGames, teams, students = [], onBack }) => {
                                         <td className="border-2 border-gray-300 p-4 text-center font-bold text-amber-600">{player.stats?.goodDefense || 0}</td>
                                         <td className="border-2 border-gray-300 p-4 text-center font-bold text-purple-600">{player.stats?.bonusCookie || 0}</td>
                                         <td className="border-2 border-gray-300 p-4 text-center">
-                                          {player.newBadges && player.newBadges.length > 0 ? (
-                                            <div className="flex flex-wrap gap-1 justify-center">
-                                              {player.newBadges.map((badge, bidx) => (
-                                                <span key={bidx} className="text-2xl" title={badge.name}>
-                                                  {badge.emoji}
-                                                </span>
-                                              ))}
-                                            </div>
-                                          ) : (
-                                            <span className="text-gray-400">-</span>
-                                          )}
+                                          <div className="flex justify-center">
+                                            <PlayerBadgeDisplay
+                                              player={{ badges: player.newBadges }}
+                                              maxBadges={5}
+                                              size="lg"
+                                              showEmpty={false}
+                                              showOverflow={true}
+                                            />
+                                          </div>
                                         </td>
                                       </tr>
                                     ))}

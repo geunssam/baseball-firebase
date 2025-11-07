@@ -108,7 +108,13 @@ const RestBadgeItem = ({ badge, getTierName }) => {
   );
 };
 
-const PlayerBadgeOrderModal = ({ player, allBadges, onClose, onSave, playerStats }) => {
+const PlayerBadgeOrderModal = ({ open, onOpenChange, player, allBadges, onClose, onSave, playerStats }) => {
+  // open이 false면 렌더링하지 않음
+  if (!open) return null;
+
+  // onOpenChange가 있으면 사용, 없으면 onClose 사용 (하위 호환성)
+  const handleClose = onOpenChange || onClose;
+
   // 디버깅 로그
   console.log('🏅 PlayerBadgeOrderModal 열림:', {
     playerName: player.name,
@@ -124,7 +130,7 @@ const PlayerBadgeOrderModal = ({ player, allBadges, onClose, onSave, playerStats
   const allBadgeIds = player.badges || [];
 
   // BADGES 객체의 lowercase id로 찾을 수 있도록 lookup 맵 생성
-  const badgeLookup = Object.values(allBadges).reduce((acc, badge) => {
+  const badgeLookup = Object.values(allBadges || {}).reduce((acc, badge) => {
     acc[badge.id] = badge;
     return acc;
   }, {});
@@ -299,7 +305,7 @@ const PlayerBadgeOrderModal = ({ player, allBadges, onClose, onSave, playerStats
       await onSave(allBadges);
 
       console.log('✅ [배지순서] 저장 완료, 모달 닫기');
-      onClose();
+      handleClose(false);
     } catch (error) {
       console.error('❌ [배지순서] 저장 실패:', error);
       alert('배지 순서 저장에 실패했습니다. 다시 시도해주세요.');
@@ -655,7 +661,7 @@ const PlayerBadgeOrderModal = ({ player, allBadges, onClose, onSave, playerStats
         {/* 푸터 버튼 */}
         <div className="border-t border-gray-200 p-4 flex gap-3 justify-end bg-gray-50">
           <button
-            onClick={onClose}
+            onClick={() => handleClose(false)}
             className="px-6 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold transition-colors"
           >
             취소

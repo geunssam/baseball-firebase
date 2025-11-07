@@ -20,9 +20,10 @@ import BadgeManagementModal from './BadgeManagementModal';
 import ManualBadgeModal from './ManualBadgeModal';
 import ClassRankingWidget from './ClassRankingWidget';
 import ClassDetailRankingModal from './ClassDetailRankingModal';
+import SettingsView from './SettingsView';
 import { useModalKeyboard } from '../hooks/useKeyboardShortcut';
 import { BADGES } from '../utils/badgeSystem';
-import { saveCustomBadge, loadCustomBadges, deleteCustomBadge, awardManualBadge, recalculateAllStudentBadges, saveGameDefaultSettings, getGameDefaultSettings } from '../services/firestoreService';
+import { saveCustomBadge, loadCustomBadges, deleteCustomBadge, awardManualBadge, recalculateAllStudentBadges, saveGameDefaultSettings, getGameDefaultSettings, migrateFinishedGamesWithBadges, migrateBadgesFieldToFinishedGames } from '../services/firestoreService';
 
 const MainApp = () => {
   const { user, signOut } = useAuth();
@@ -75,6 +76,12 @@ const MainApp = () => {
   // 경기 설정 관련 상태
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [gameDefaultSettings, setGameDefaultSettings] = useState(null);
+
+  // 마이그레이션 관련 상태
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationProgress, setMigrationProgress] = useState(null);
+  const [isMigratingBadgesField, setIsMigratingBadgesField] = useState(false);
+  const [migrationBadgesFieldProgress, setMigrationBadgesFieldProgress] = useState(null);
 
   // 현재 날짜/시간 업데이트
   useEffect(() => {
@@ -297,6 +304,55 @@ const MainApp = () => {
       alert('❌ 배지 재계산에 실패했습니다: ' + error.message);
     } finally {
       setIsRecalculating(false);
+    }
+  };
+
+  // 완료된 경기에 배지 정보 마이그레이션 핸들러
+  const handleMigrateFinishedGames = async () => {
+    if (!confirm('기존 완료된 경기에 배지 정보를 추가하시겠습니까?\n\n⚠️ 이 작업은 일회용이며, 이미 배지 정보가 있는 경기는 건너뜁니다.\n\n이 작업은 시간이 걸릴 수 있습니다.')) {
+      return;
+    }
+
+    setIsMigrating(true);
+    setMigrationProgress('마이그레이션 시작 중...');
+
+    try {
+      const result = await migrateFinishedGamesWithBadges();
+
+      alert(`✅ 마이그레이션 완료!\n\n총 경기 수: ${result.totalGames}개\n✅ 업데이트됨: ${result.updatedCount}개\n⏭️ 건너뜀: ${result.skippedCount}개\n❌ 오류: ${result.errorCount}개\n🏅 추가된 배지: ${result.totalBadgesAdded}개`);
+      setMigrationProgress(null);
+    } catch (error) {
+      console.error('마이그레이션 실패:', error);
+      alert('❌ 마이그레이션에 실패했습니다: ' + error.message);
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
+  // 완료된 경기에 badges 필드 마이그레이션 핸들러
+  const handleMigrateBadgesField = async () => {
+    if (!confirm('기존 완료된 경기에 전체 배지 필드를 추가하시겠습니까?\n\n⚠️ 이미 badges 필드가 있는 경기도 강제로 재계산됩니다.\n⚠️ 이전 로직으로 저장된 잘못된 데이터를 수정합니다.\n\n통계 뷰의 "배지" 컬럼에 경기 시작 전 배지가 표시됩니다.\n\n이 작업은 시간이 걸릴 수 있습니다.')) {
+      return;
+    }
+
+    setIsMigratingBadgesField(true);
+    setMigrationBadgesFieldProgress('마이그레이션 시작 중...');
+
+    try {
+      const result = await migrateBadgesFieldToFinishedGames(
+        (progress) => {
+          setMigrationBadgesFieldProgress(progress);
+        },
+        true  // ✅ 강제 재계산 모드
+      );
+
+      alert(`✅ 배지 필드 마이그레이션 완료!\n\n총 경기 수: ${result.totalGames}개\n✅ 업데이트됨: ${result.updatedCount}개\n⏭️ 건너뜀: ${result.skippedCount}개\n❌ 오류: ${result.errorCount}개`);
+      setMigrationBadgesFieldProgress(null);
+    } catch (error) {
+      console.error('배지 필드 마이그레이션 실패:', error);
+      alert('❌ 배지 필드 마이그레이션에 실패했습니다: ' + error.message);
+    } finally {
+      setIsMigratingBadgesField(false);
     }
   };
 
@@ -562,13 +618,6 @@ const MainApp = () => {
                 📋 학생코드
               </Button>
               <Button
-                onClick={() => setShowBadgeManagement(true)}
-                size="sm"
-                className="bg-purple-100 hover:bg-purple-200 text-purple-700 border-purple-200 text-sm tablet:text-base tablet-lg:text-lg"
-              >
-                ⚙️ 배지 관리
-              </Button>
-              <Button
                 onClick={() => setDashboardView('classRanking')}
                 size="sm"
                 className="bg-yellow-100 hover:bg-yellow-200 text-yellow-700 border-yellow-200 text-sm tablet:text-base tablet-lg:text-lg"
@@ -576,7 +625,7 @@ const MainApp = () => {
                 🏆 학급 랭킹
               </Button>
               <Button
-                onClick={() => setShowSettingsModal(true)}
+                onClick={() => setDashboardView('settings')}
                 size="sm"
                 className="bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-200 text-sm tablet:text-base tablet-lg:text-lg"
               >
@@ -1097,6 +1146,23 @@ const MainApp = () => {
           </div>
         )}
 
+        {/* 설정 뷰 */}
+        {dashboardView === 'settings' && (
+          <div className="w-full h-[calc(100vh-4rem-3.5rem)]">
+            <SettingsView
+              onBack={() => setDashboardView('dashboard')}
+              customBadges={customBadges}
+              systemBadges={Object.values(BADGES)}
+              hiddenBadges={hiddenBadges}
+              onSaveBadge={handleSaveBadge}
+              onDeleteBadge={handleDeleteBadge}
+              onToggleBadgeVisibility={handleHideBadge}
+              gameDefaultSettings={gameDefaultSettings}
+              onSaveGameSettings={handleSaveGameSettings}
+            />
+          </div>
+        )}
+
         {/* 팀 생성 다이얼로그 */}
         <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
           <DialogContent className="sm:max-w-[425px]">
@@ -1191,6 +1257,12 @@ const MainApp = () => {
           onRecalculateAllBadges={handleRecalculateAllBadges}
           isRecalculating={isRecalculating}
           recalculateProgress={recalculateProgress}
+          onMigrateFinishedGames={handleMigrateFinishedGames}
+          isMigrating={isMigrating}
+          migrationProgress={migrationProgress}
+          onMigrateBadgesField={handleMigrateBadgesField}
+          isMigratingBadgesField={isMigratingBadgesField}
+          migrationBadgesFieldProgress={migrationBadgesFieldProgress}
         />
 
         {/* 수동 배지 부여 모달 */}

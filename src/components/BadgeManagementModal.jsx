@@ -16,7 +16,13 @@ export default function BadgeManagementModal({
   hiddenBadges = [],
   onRecalculateAllBadges,
   isRecalculating = false,
-  recalculateProgress = null
+  recalculateProgress = null,
+  onMigrateFinishedGames,
+  isMigrating = false,
+  migrationProgress = null,
+  onMigrateBadgesField,
+  isMigratingBadgesField = false,
+  migrationBadgesFieldProgress = null
 }) {
   const [activeTab, setActiveTab] = useState('create');
   const [editMode, setEditMode] = useState('custom'); // 'system' | 'custom'
@@ -241,6 +247,104 @@ export default function BadgeManagementModal({
                       <li>학생 수가 많으면 시간이 걸릴 수 있습니다</li>
                       <li>재계산 중에는 다른 작업을 피해주세요</li>
                       <li>재계산 후 자동으로 저장됩니다</li>
+                    </ul>
+                  </div>
+                </div>
+              </Card>
+
+              {/* 경기 배지 마이그레이션 섹션 */}
+              <Card className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="text-4xl">🔧</div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-gray-800 mb-2">
+                        완료된 경기 배지 정보 추가
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-3">
+                        기존 완료된 경기에 배지 정보를 추가합니다.
+                        이 작업은 일회용이며, 이미 배지 정보가 있는 경기는 자동으로 건너뜁니다.
+                      </p>
+
+                      {/* 진행 상황 표시 */}
+                      {isMigrating && migrationProgress && (
+                        <div className="space-y-2 mb-4 p-3 bg-white rounded-lg border border-blue-300">
+                          <p className="text-blue-800 font-semibold">
+                            {migrationProgress}
+                          </p>
+                          <div className="w-full bg-blue-200 rounded-full h-2">
+                            <div className="bg-blue-500 h-2 rounded-full animate-pulse" style={{ width: '100%' }} />
+                          </div>
+                        </div>
+                      )}
+
+                      <Button
+                        onClick={onMigrateFinishedGames}
+                        disabled={isMigrating}
+                        className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isMigrating ? '🔧 마이그레이션 중...' : '🔧 배지 정보 추가 시작'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* 주의사항 */}
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800 font-semibold mb-2">ℹ️ 안내</p>
+                    <ul className="text-sm text-blue-700 space-y-1 list-disc list-inside">
+                      <li>이 작업은 일회용으로, 최초 1회만 실행하면 됩니다</li>
+                      <li>이미 배지 정보가 있는 경기는 건너뜁니다</li>
+                      <li>완료 후 통계 뷰에서 배지 정보를 확인할 수 있습니다</li>
+                      <li>경기 수가 많으면 시간이 걸릴 수 있습니다</li>
+                    </ul>
+                  </div>
+                </div>
+              </Card>
+
+              {/* badges 필드 마이그레이션 섹션 */}
+              <Card className="p-6 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="text-4xl">🎖️</div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-gray-800 mb-2">
+                        전체 배지 필드 추가
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-3">
+                        완료된 경기에 각 선수의 경기 종료 시점 전체 배지 목록(badges)을 추가합니다.
+                        통계 뷰의 "배지" 컬럼에 배지가 표시되도록 합니다.
+                      </p>
+
+                      {/* 진행 상황 표시 */}
+                      {isMigratingBadgesField && migrationBadgesFieldProgress && (
+                        <div className="space-y-2 mb-4 p-3 bg-white rounded-lg border border-green-300">
+                          <p className="text-green-800 font-semibold">
+                            {migrationBadgesFieldProgress}
+                          </p>
+                          <div className="w-full bg-green-200 rounded-full h-2">
+                            <div className="bg-green-500 h-2 rounded-full animate-pulse" style={{ width: '100%' }} />
+                          </div>
+                        </div>
+                      )}
+
+                      <Button
+                        onClick={onMigrateBadgesField}
+                        disabled={isMigratingBadgesField}
+                        className="bg-green-500 hover:bg-green-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isMigratingBadgesField ? '🎖️ 마이그레이션 중...' : '🎖️ 배지 필드 추가 시작'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* 주의사항 */}
+                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-800 font-semibold mb-2">ℹ️ 안내</p>
+                    <ul className="text-sm text-green-700 space-y-1 list-disc list-inside">
+                      <li>이 작업은 일회용으로, 최초 1회만 실행하면 됩니다</li>
+                      <li>이미 badges 필드가 있는 경기는 건너뜁니다</li>
+                      <li>완료 후 통계 뷰의 "배지" 컬럼에 배지가 표시됩니다</li>
+                      <li>경기 수가 많으면 시간이 걸릴 수 있습니다</li>
                     </ul>
                   </div>
                 </div>

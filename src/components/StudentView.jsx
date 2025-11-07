@@ -6,6 +6,8 @@ import { BADGES } from '../utils/badgeSystem';
 import StudentGameHistory from './StudentGameHistory';
 import { getPlayerDetailedHistory, updatePlayerBadgeOrder } from '../services/firestoreService';
 import PlayerBadgeOrderModal from './PlayerBadgeOrderModal';
+import { getNextBadgesProgress } from '../utils/badgeProgress';
+import { BADGE_CATEGORIES } from '../utils/badgeCategories';
 
 // 🔹 배지 티어 정의
 const BADGE_TIERS = {
@@ -24,19 +26,12 @@ export default function StudentView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isBadgeOrderModalOpen, setIsBadgeOrderModalOpen] = useState(false);
+  const [showProgressModal, setShowProgressModal] = useState(false);
 
-  // 🔹 학생 데이터 로드 (1분마다 자동 갱신)
+  // 🔹 학생 데이터 로드 (최초 1회만)
   useEffect(() => {
     if (studentData?.playerId) {
       loadStudentData();
-
-      // 1분(60초)마다 자동 갱신
-      const interval = setInterval(() => {
-        console.log('🔄 자동 갱신 중...');
-        loadStudentData();
-      }, 60000);
-
-      return () => clearInterval(interval);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentData?.playerId]);
@@ -53,12 +48,15 @@ export default function StudentView() {
       const historySnapshot = await getDoc(historyDocRef);
 
       let totalStats = {
-        total_games: 0,
-        total_hits: 0,
-        total_runs: 0,
-        total_homeruns: 0,
-        total_good_defense: 0,
-        total_bonus_cookie: 0,
+        gamesPlayed: 0,
+        totalHits: 0,
+        totalRuns: 0,
+        totalHomeruns: 0,
+        totalGoodDefense: 0,
+        totalBonusCookie: 0,
+        mvpCount: 0,
+        totalPoints: 0,
+        totalBadges: 0
       };
 
       if (historySnapshot.exists()) {
@@ -66,13 +64,18 @@ export default function StudentView() {
         const games = historyData.games || [];
 
         games.forEach(game => {
-          totalStats.total_games++;
-          totalStats.total_hits += game.stats?.hits || 0;
-          totalStats.total_runs += game.stats?.runs || 0;
-          totalStats.total_homeruns += game.stats?.homerun || 0;
-          totalStats.total_good_defense += game.stats?.goodDefense || 0;
-          totalStats.total_bonus_cookie += game.stats?.bonusCookie || 0;
+          totalStats.gamesPlayed++;
+          totalStats.totalHits += game.stats?.hits || 0;
+          totalStats.totalRuns += game.stats?.runs || 0;
+          totalStats.totalHomeruns += game.stats?.homerun || 0;
+          totalStats.totalGoodDefense += game.stats?.goodDefense || 0;
+          totalStats.totalBonusCookie += game.stats?.bonusCookie || 0;
+          if (game.isMVP) totalStats.mvpCount++;
         });
+
+        // 총점 계산
+        totalStats.totalPoints = totalStats.totalHits + totalStats.totalRuns +
+                                  totalStats.totalGoodDefense + totalStats.totalBonusCookie;
       }
 
       // 📌 진행 중인 경기에서 현재 스탯 추가 (새로 추가)
@@ -121,11 +124,15 @@ export default function StudentView() {
 
           if (currentPlayer?.stats) {
             // 진행 중인 경기 스탯 추가
-            totalStats.total_hits += currentPlayer.stats.hits || 0;
-            totalStats.total_runs += currentPlayer.stats.runs || 0;
-            totalStats.total_homeruns += currentPlayer.stats.homerun || 0;
-            totalStats.total_good_defense += currentPlayer.stats.goodDefense || 0;
-            totalStats.total_bonus_cookie += currentPlayer.stats.bonusCookie || 0;
+            totalStats.totalHits += currentPlayer.stats.hits || 0;
+            totalStats.totalRuns += currentPlayer.stats.runs || 0;
+            totalStats.totalHomeruns += currentPlayer.stats.homerun || 0;
+            totalStats.totalGoodDefense += currentPlayer.stats.goodDefense || 0;
+            totalStats.totalBonusCookie += currentPlayer.stats.bonusCookie || 0;
+
+            // 총점 재계산
+            totalStats.totalPoints = totalStats.totalHits + totalStats.totalRuns +
+                                      totalStats.totalGoodDefense + totalStats.totalBonusCookie;
 
             console.log('✅ 진행 중인 경기 스탯 추가:', {
               player: currentPlayer.name,
@@ -149,6 +156,9 @@ export default function StudentView() {
         const badgesData = badgesSnapshot.data();
         earnedBadges = badgesData.badges || [];
       }
+
+      // totalStats에 배지 개수 추가 (완전체 배지 진행도 계산용)
+      totalStats.totalBadges = earnedBadges.length;
 
       // 배지별 수여일 찾기 (getPlayerDetailedHistory 사용)
       const detailedHistory = await getPlayerDetailedHistory(studentData.teacherId, studentData.playerId);
@@ -313,14 +323,14 @@ export default function StudentView() {
     }
   };
 
-  // 🔹 배지 등급별 색상 (파스텔톤)
+  // 🔹 배지 등급별 색상 (옅은 파스텔톤)
   const getTierColor = (tier) => {
     const tierColors = {
-      [BADGE_TIERS.BEGINNER]: 'from-gray-200 to-gray-300',      // 밝은 회색
-      [BADGE_TIERS.SKILLED]: 'from-green-200 to-green-300',     // 파스텔 그린
-      [BADGE_TIERS.MASTER]: 'from-blue-200 to-blue-300',        // 파스텔 블루
-      [BADGE_TIERS.SPECIAL]: 'from-purple-200 to-purple-300',   // 파스텔 퍼플
-      [BADGE_TIERS.LEGEND]: 'from-yellow-200 to-amber-300'      // 파스텔 골드
+      [BADGE_TIERS.BEGINNER]: 'from-gray-200 to-gray-300',      // 옅은 회색
+      [BADGE_TIERS.SKILLED]: 'from-green-200 to-green-300',     // 옅은 그린
+      [BADGE_TIERS.MASTER]: 'from-blue-200 to-blue-300',        // 옅은 블루
+      [BADGE_TIERS.SPECIAL]: 'from-purple-200 to-purple-300',   // 옅은 퍼플
+      [BADGE_TIERS.LEGEND]: 'from-yellow-200 to-amber-300'      // 옅은 골드
     };
     return tierColors[tier] || 'from-gray-200 to-gray-300';
   };
@@ -352,32 +362,28 @@ export default function StudentView() {
       <div className="max-w-6xl mx-auto">
         {/* 헤더 */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="text-center md:text-left">
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
-                🎓 {studentData.name} <span className="text-2xl text-gray-600">({studentData.className})</span>
-              </h1>
+          <div className="flex items-center justify-between">
+            {/* 왼쪽: 대시보드 버튼 */}
+            <button
+              onClick={() => {
+                logout();
+              }}
+              className="bg-sky-100 hover:bg-sky-200 text-gray-800 px-6 py-3 rounded-lg font-bold transition shadow-lg hover:shadow-xl text-lg flex-shrink-0"
+            >
+              ← 대시보드
+            </button>
+
+            {/* 가운데: 이름 (배경색) */}
+            <div className="absolute left-1/2 transform -translate-x-1/2">
+              <div className="bg-gradient-to-r from-purple-100 to-pink-100 px-6 py-3 rounded-xl shadow-lg">
+                <h1 className="text-3xl font-bold text-black whitespace-nowrap">
+                  🎓 {studentData.name} <span className="text-xl text-gray-700">({studentData.className})</span>
+                </h1>
+              </div>
             </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  console.log('🔄 수동 새로고침 시작');
-                  loadStudentData();
-                }}
-                className="bg-green-200 hover:bg-green-300 text-gray-800 px-6 py-3 rounded-lg font-bold transition shadow-lg hover:shadow-xl flex items-center gap-2 text-lg"
-                disabled={loading}
-              >
-                {loading ? '🔄 갱신 중...' : '🔄 새로고침'}
-              </button>
-              <button
-                onClick={() => {
-                  logout();
-                }}
-                className="bg-blue-200 hover:bg-blue-300 text-gray-800 px-6 py-3 rounded-lg font-bold transition shadow-lg hover:shadow-xl text-lg"
-              >
-                ← 선생님 페이지로 돌아가기
-              </button>
-            </div>
+
+            {/* 우측: 빈 공간 (레이아웃 균형) */}
+            <div className="w-[140px] flex-shrink-0"></div>
           </div>
         </div>
 
@@ -391,23 +397,33 @@ export default function StudentView() {
         {/* 배지 컬렉션 */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-              🏅 나의 배지
-            </h2>
-            {badges.length > 0 && (
+            <div className="bg-gradient-to-r from-yellow-100 to-orange-100 px-4 py-2 rounded-lg">
+              <h2 className="text-3xl font-bold text-black flex items-center gap-2">
+                🏅 나의 배지
+              </h2>
+            </div>
+            <div className="flex gap-2">
               <button
-                onClick={() => setIsBadgeOrderModalOpen(true)}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium"
+                onClick={() => setShowProgressModal(true)}
+                className="px-4 py-2 bg-green-100 hover:bg-green-200 text-black rounded-lg transition-colors font-bold"
               >
-                🔀 배지 순서 변경
+                📊 진행상황 보기
               </button>
-            )}
+              {badges.length > 0 && (
+                <button
+                  onClick={() => setIsBadgeOrderModalOpen(true)}
+                  className="px-4 py-2 bg-sky-100 hover:bg-sky-200 text-black rounded-lg transition-colors font-bold"
+                >
+                  🔀 배지 순서 변경
+                </button>
+              )}
+            </div>
           </div>
           {badges.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
+            <div className="text-center py-12 text-black">
               <div className="text-6xl mb-4">🎯</div>
-              <p className="text-lg">아직 획득한 배지가 없습니다.</p>
-              <p className="text-sm mt-2">열심히 활동해서 배지를 모아보세요!</p>
+              <p className="text-lg font-bold">아직 획득한 배지가 없습니다.</p>
+              <p className="text-sm mt-2 font-bold">열심히 활동해서 배지를 모아보세요!</p>
             </div>
           ) : (
             <div className={`grid ${
@@ -433,10 +449,10 @@ export default function StudentView() {
                       <div className="flex items-center justify-center gap-3 mb-2">
                         <span className="text-5xl">{badge.badge?.icon || '🏅'}</span>
                         <div className="text-left">
-                          <div className="text-gray-800 font-bold text-base">
-                            {badge.badge?.name || '배지'} <span className="text-gray-600 text-sm">({getTierLabel(badge.badge?.tier)})</span>
+                          <div className="text-black font-bold text-base">
+                            {badge.badge?.name || '배지'} <span className="text-black font-bold text-sm">({getTierLabel(badge.badge?.tier)})</span>
                           </div>
-                          <div className="text-gray-500 text-sm mt-1">
+                          <div className="text-black font-bold text-sm mt-1">
                             📅 {formatDate(badge.earned_at)}
                           </div>
                         </div>
@@ -459,9 +475,11 @@ export default function StudentView() {
 
         {/* 반 랭킹 */}
         <div className="bg-white rounded-2xl shadow-xl p-6">
-          <h2 className="text-3xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            🏆 우리 반 랭킹
-          </h2>
+          <div className="bg-gradient-to-r from-green-100 to-teal-100 px-4 py-2 rounded-lg inline-block mb-4">
+            <h2 className="text-3xl font-bold text-black flex items-center gap-2">
+              🏆 우리 반 랭킹
+            </h2>
+          </div>
           {classRanking.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <div className="text-6xl mb-4">👥</div>
@@ -515,6 +533,111 @@ export default function StudentView() {
           )}
         </div>
 
+        {/* 배지 진행상황 모달 */}
+        {showProgressModal && (
+          <div
+            className="fixed inset-0 bg-black/30 flex items-center justify-center z-[9999]"
+            onClick={() => setShowProgressModal(false)}
+          >
+            <div
+              className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="bg-gradient-to-r from-purple-100 to-indigo-100 px-4 py-2 rounded-lg">
+                  <h3 className="text-2xl font-bold text-black">📊 다음 배지 진행도</h3>
+                </div>
+                <button
+                  onClick={() => setShowProgressModal(false)}
+                  className="text-gray-400 hover:text-gray-600 text-3xl leading-none"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {(() => {
+                  // 현재 배지 ID 목록
+                  const currentBadgeIds = badges.map(b => b.badge_id);
+
+                  // 진행상황 계산
+                  const progressData = getNextBadgesProgress(
+                    stats || {},
+                    currentBadgeIds,
+                    BADGES,
+                    true
+                  );
+
+                  // 모든 카테고리별 진행도 생성
+                  const allCategoryProgress = Object.values(BADGE_CATEGORIES)
+                    .filter(cat => cat.id !== 'special')
+                    .map(category => {
+                      const found = progressData.find(p => p.category === category.id);
+                      if (found) return found;
+
+                      return {
+                        badge: {
+                          icon: category.icon,
+                          name: category.name,
+                          description: category.description
+                        },
+                        progress: 0,
+                        current: 0,
+                        target: 1,
+                        category: category.id
+                      };
+                    });
+
+                  if (allCategoryProgress.length === 0) {
+                    return (
+                      <div className="text-center py-8 text-gray-500">
+                        <div className="text-5xl mb-3">🎉</div>
+                        <p className="text-lg font-semibold">모든 배지를 획득했습니다!</p>
+                      </div>
+                    );
+                  }
+
+                  return allCategoryProgress.map((progress, idx) => (
+                    <div key={idx} className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="text-3xl">{progress.badge.icon}</span>
+                        <div className="flex-1">
+                          <div className="font-semibold text-base text-gray-800">
+                            {progress.badge.name}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {progress.badge.description}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 진행도 바 */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 bg-gray-200 rounded-full h-4 overflow-hidden">
+                          <div
+                            className="bg-gradient-to-r from-yellow-400 to-orange-400 h-full transition-all duration-300"
+                            style={{ width: `${progress.progress}%` }}
+                          />
+                        </div>
+                        <span className="text-sm text-gray-600 font-semibold whitespace-nowrap min-w-[60px] text-right">
+                          {progress.current}/{progress.target} ({Math.round(progress.progress)}%)
+                        </span>
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+
+              <button
+                onClick={() => setShowProgressModal(false)}
+                className="w-full mt-6 py-3 bg-gray-200 hover:bg-gray-300 rounded-lg font-semibold text-gray-700 transition-colors"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* 배지 순서 변경 모달 */}
         <PlayerBadgeOrderModal
           open={isBadgeOrderModalOpen}
@@ -523,6 +646,7 @@ export default function StudentView() {
             name: studentData?.playerName || '학생',
             badges: badges.map(b => b.badge_id)
           }}
+          allBadges={BADGES}
           onSave={handleSaveBadgeOrder}
         />
       </div>

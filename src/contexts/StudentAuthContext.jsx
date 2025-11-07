@@ -8,21 +8,21 @@ export function StudentAuthProvider({ children }) {
   const [studentData, setStudentData] = useState(null); // { id, name, studentCode, className, teacherId }
   const [loading, setLoading] = useState(true);
 
-  // 🔹 컴포넌트 마운트 시 sessionStorage에서 학생 정보 복원
+  // 🔹 컴포넌트 마운트 시 localStorage에서 학생 정보 복원
   useEffect(() => {
     console.log('🔄 StudentAuthContext: Initializing...');
-    const savedStudent = sessionStorage.getItem('studentData');
+    const savedStudent = localStorage.getItem('studentData');
     if (savedStudent) {
       try {
         const parsed = JSON.parse(savedStudent);
-        console.log('✅ StudentAuthContext: Restored student from sessionStorage:', parsed.name);
+        console.log('✅ StudentAuthContext: Restored student from localStorage:', parsed.name);
         setStudentData(parsed);
       } catch (error) {
-        console.error('❌ Failed to parse studentData from sessionStorage:', error);
-        sessionStorage.removeItem('studentData');
+        console.error('❌ Failed to parse studentData from localStorage:', error);
+        localStorage.removeItem('studentData');
       }
     } else {
-      console.log('ℹ️ StudentAuthContext: No saved student in sessionStorage');
+      console.log('ℹ️ StudentAuthContext: No saved student in localStorage');
     }
     console.log('✅ StudentAuthContext: Initialization complete, setting loading to false');
     setLoading(false);
@@ -76,9 +76,9 @@ export function StudentAuthProvider({ children }) {
 
       console.log('✅ StudentAuthContext: Login successful, student data:', student);
 
-      // sessionStorage에 저장 (탭 단위로만 유지, 보안성 향상)
-      sessionStorage.setItem('studentData', JSON.stringify(student));
-      console.log('✅ StudentAuthContext: Saved to sessionStorage');
+      // localStorage에 저장 (새로고침 시에도 유지)
+      localStorage.setItem('studentData', JSON.stringify(student));
+      console.log('✅ StudentAuthContext: Saved to localStorage');
 
       setStudentData(student);
       console.log('✅ StudentAuthContext: setStudentData called');
@@ -96,7 +96,7 @@ export function StudentAuthProvider({ children }) {
 
   // �� 로그아웃
   const logout = () => {
-    sessionStorage.removeItem('studentData');
+    localStorage.removeItem('studentData');
     setStudentData(null);
     console.log('✅ Student logged out');
   };

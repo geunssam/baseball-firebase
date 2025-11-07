@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../config/firebase';
 import { useGame } from '../contexts/GameContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Card } from './ui/card';
@@ -11,7 +13,7 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ChevronLeft, ChevronRight, Plus, Trash2, X, GripVertical, ChevronDown, ChevronUp, Lock } from 'lucide-react';
 import { DndContext, closestCenter, closestCorners, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { SortableContext, verticalListSortingStrategy, rectSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import ClassShareSelectionModal from './ClassShareSelectionModal';
@@ -20,12 +22,15 @@ import ShareManagementModal from './ShareManagementModal';
 import SharedItemsSection from './SharedItemsSection';
 import { isSharedItem, canEdit, canManage, getPermissionBadgeInfo } from '../utils/permissionHelpers.jsx';
 import PlayerBadgeDisplay from './PlayerBadgeDisplay';
+import StudentHistoryModal from './StudentHistoryModal';
+import { calculateAllClassStats, calculateStudentStats } from '../utils/classStatsCalculator';
+import { calculateAllTeamStats } from '../utils/teamStatsCalculator';
 
 /**
  * SortablePlayerRow
  * 드래그 가능한 선수 행
  */
-const SortablePlayerRow = ({ player, index, isTeamEditMode, positions, onChangePosition, onRemove, students }) => {
+const SortablePlayerRow = ({ player, index, isTeamEditMode, positions, onChangePosition, onRemove, students, studentStats }) => {
   const [isCustomInput, setIsCustomInput] = useState(false);
   const [customPosition, setCustomPosition] = useState('');
 
@@ -81,7 +86,7 @@ const SortablePlayerRow = ({ player, index, isTeamEditMode, positions, onChangeP
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_1fr_32px] gap-3 items-center px-1.5 py-1.5 border rounded-lg hover:bg-muted/50 transition-colors group bg-background ${
+      className={`grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_2fr_1fr_32px] gap-3 items-center px-1.5 py-1.5 border rounded-lg hover:bg-muted/50 transition-colors group bg-background ${
         isDragging ? 'opacity-50 z-50' : ''
       }`}
     >
@@ -108,7 +113,7 @@ const SortablePlayerRow = ({ player, index, isTeamEditMode, positions, onChangeP
         <PlayerBadgeDisplay
           player={studentWithBadges}
           maxBadges={3}
-          size="md"
+          size="lg"
           showEmpty={false}
           showOverflow={true}
         />
@@ -122,20 +127,42 @@ const SortablePlayerRow = ({ player, index, isTeamEditMode, positions, onChangeP
       {/* 학급 */}
       <div className="flex items-center justify-center">
         {player.className ? (
-          <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200 text-blue-700 px-2 py-0.5 whitespace-nowrap">
+          <Badge variant="outline" className="text-base bg-blue-50 border-blue-200 text-blue-700 px-2 py-0.5 whitespace-nowrap">
             {player.className}
           </Badge>
         ) : (
-          <span className="text-xs text-muted-foreground">-</span>
+          <span className="text-base text-muted-foreground">-</span>
         )}
       </div>
 
       {/* 학급번호 */}
       <div className="flex items-center justify-center">
-        {player.number ? (
-          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">#{player.number}</span>
+        {studentWithBadges.number ? (
+          <span className="text-base font-bold text-muted-foreground whitespace-nowrap">#{studentWithBadges.number}</span>
         ) : (
-          <span className="text-xs text-muted-foreground">-</span>
+          <span className="text-base text-muted-foreground">-</span>
+        )}
+      </div>
+
+      {/* 스탯 */}
+      <div className="flex items-center justify-center">
+        {studentStats?.[player.playerId || player.id] ? (
+          <span className="inline-flex items-center gap-2.5 text-lg font-semibold">
+            <span title="안타" className="flex items-center gap-0.5">
+              <span className="text-xl">⚾</span>{studentStats[player.playerId || player.id].hits || 0}
+            </span>
+            <span title="득점" className="flex items-center gap-0.5">
+              <span className="text-xl">🏃‍♂️</span>{studentStats[player.playerId || player.id].runs || 0}
+            </span>
+            <span title="수비" className="flex items-center gap-0.5">
+              <span className="text-xl">🛡️</span>{studentStats[player.playerId || player.id].defense || 0}
+            </span>
+            <span title="쿠키" className="flex items-center gap-0.5">
+              <span className="text-xl">🍪</span>{studentStats[player.playerId || player.id].cookie || 0}
+            </span>
+          </span>
+        ) : (
+          <span className="text-lg text-muted-foreground">-</span>
         )}
       </div>
 
@@ -148,7 +175,7 @@ const SortablePlayerRow = ({ player, index, isTeamEditMode, positions, onChangeP
               value={customPosition}
               onChange={(e) => setCustomPosition(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCustomPositionSubmit()}
-              className="h-8 text-sm flex-1"
+              className="h-8 text-base flex-1"
               autoFocus
             />
             <Button
@@ -161,12 +188,12 @@ const SortablePlayerRow = ({ player, index, isTeamEditMode, positions, onChangeP
           </div>
         ) : (
           <Select value={player.position || ''} onValueChange={handlePositionChange}>
-            <SelectTrigger className="h-8 text-sm w-full">
+            <SelectTrigger className="h-8 text-base w-full">
               <SelectValue placeholder="포지션 선택" />
             </SelectTrigger>
             <SelectContent>
               {positions.map((pos) => (
-                <SelectItem key={pos} value={pos} className="text-sm">
+                <SelectItem key={pos} value={pos} className="text-base">
                   {pos}
                 </SelectItem>
               ))}
@@ -296,6 +323,168 @@ const SortablePlayerRowForNewTeam = ({ player, index, autoPosition, currentPosit
 };
 
 /**
+ * SortableStudentCard
+ * 드래그 가능한 학생 카드 (학급 관리용)
+ */
+const SortableStudentCard = ({
+  student,
+  isClassEditMode,
+  selectedStudents,
+  toggleStudentSelection,
+  updateStudent,
+  handleOpenDeleteStudent,
+  setSelectedStudentForHistory,
+  setShowStudentHistoryModal,
+  studentStats,
+  loadingStudentStats
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({
+    id: student.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    ...(isDragging ? { pointerEvents: 'none' } : {}),
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`
+        relative py-2 px-3 rounded-lg border-2 font-medium transition-all cursor-pointer
+        ${
+          selectedStudents.includes(student.id)
+            ? 'bg-primary/10 border-primary text-primary'
+            : 'bg-card border-border hover:border-primary/50'
+        }
+        ${isDragging ? 'opacity-50 z-50 shadow-lg' : ''}
+      `}
+    >
+      {/* 번호 표시 (좌측 상단) */}
+      {student.number && (
+        <div className="absolute top-1.5 left-1.5 bg-blue-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+          {student.number}
+        </div>
+      )}
+
+      {/* 드래그 핸들 (편집 모드에서만, 우측 상단) */}
+      {isClassEditMode && (
+        <div
+          {...attributes}
+          {...listeners}
+          className="absolute top-1.5 right-1.5 cursor-move text-muted-foreground hover:text-foreground p-1 bg-white/80 rounded"
+          title="드래그하여 순서 변경"
+        >
+          <GripVertical className="w-4 h-4" />
+        </div>
+      )}
+
+      <button
+        onClick={() => {
+          if (isClassEditMode) {
+            toggleStudentSelection(student.id);
+          } else {
+            setSelectedStudentForHistory(student);
+            setShowStudentHistoryModal(true);
+          }
+        }}
+        className="w-full flex flex-col items-center justify-center gap-1.5"
+      >
+        {/* 첫 번째 줄: 성별 + 배지 */}
+        <div className="flex items-center justify-center gap-3 w-full">
+          {/* 성별 아이콘 */}
+          <span className="text-4xl">
+            {student.gender === 'male' ? '👨‍🎓' : student.gender === 'female' ? '👩‍🎓' : '👨‍🎓'}
+          </span>
+
+          {/* 배지 표시 */}
+          <PlayerBadgeDisplay
+            player={student}
+            maxBadges={3}
+            size="lg"
+            showEmpty={false}
+            showOverflow={true}
+          />
+        </div>
+
+        {/* 두 번째 줄: 이름 */}
+        <div className="font-bold text-xl text-center w-full">
+          {student.name}
+        </div>
+
+        {/* 세 번째 줄: 통계 정보 (편집 모드가 아닐 때만) - 한 줄로 표시 */}
+        {!isClassEditMode && (
+          <div className="w-full">
+            {studentStats[student.id] ? (
+              <div className="flex items-center justify-center gap-3 text-base">
+                <span className="flex items-center gap-1" title="안타">
+                  <span className="text-lg">⚾</span>
+                  <span className="font-bold">{studentStats[student.id].hits || 0}</span>
+                </span>
+                <span className="flex items-center gap-1" title="득점">
+                  <span className="text-lg">🏃‍♂️</span>
+                  <span className="font-bold">{studentStats[student.id].runs || 0}</span>
+                </span>
+                <span className="flex items-center gap-1" title="수비">
+                  <span className="text-lg">🛡️</span>
+                  <span className="font-bold">{studentStats[student.id].defense || 0}</span>
+                </span>
+                <span className="flex items-center gap-1" title="쿠키">
+                  <span className="text-lg">🍪</span>
+                  <span className="font-bold">{studentStats[student.id].cookie || 0}</span>
+                </span>
+              </div>
+            ) : (
+              <div className="text-base text-muted-foreground text-center">
+                {loadingStudentStats ? '로딩 중...' : '경기 기록 없음'}
+              </div>
+            )}
+          </div>
+        )}
+      </button>
+
+      {isClassEditMode && (
+        <div className="flex justify-center">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const newGender = student.gender === 'male' ? 'female' : 'male';
+              updateStudent(student.id, { gender: newGender });
+            }}
+            className="mt-1 text-[10px] px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 rounded text-blue-700 transition-colors"
+            title="성별 변경"
+          >
+            {student.gender === 'male' ? '👨→👩' : '👩→👨'}
+          </button>
+        </div>
+      )}
+
+      {isClassEditMode && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleOpenDeleteStudent(student);
+          }}
+          className="absolute -top-1.5 -right-1.5 bg-rose-200 text-rose-700 rounded-full p-0.5 hover:bg-rose-300 transition-colors shadow-md z-10"
+          title="삭제"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      )}
+    </div>
+  );
+};
+
+/**
  * ClassTeamManagementView
  *
  * 학급/팀 관리 메인 뷰
@@ -319,6 +508,12 @@ export default function ClassTeamManagementView() {
   // 편집 모드
   const [isClassEditMode, setIsClassEditMode] = useState(false); // 학급 편집 모드
   const [isTeamEditMode, setIsTeamEditMode] = useState(false); // 팀 편집 모드
+
+  // 이름 인라인 편집
+  const [editingClassName, setEditingClassName] = useState(null); // 편집 중인 학급 이름 (학급 ID)
+  const [editingTeamId, setEditingTeamId] = useState(null); // 편집 중인 팀 ID
+  const [tempClassName, setTempClassName] = useState(''); // 임시 학급 이름
+  const [tempTeamName, setTempTeamName] = useState(''); // 임시 팀 이름
 
   // 새 학급 추가 모달
   const [showAddClassModal, setShowAddClassModal] = useState(false);
@@ -368,6 +563,54 @@ export default function ClassTeamManagementView() {
   // Phase 6: 공유 관리 모달
   const [showShareManagementModal, setShowShareManagementModal] = useState(false);
   const [manageShareItem, setManageShareItem] = useState(null); // { type, id, name }
+
+  // 학급 통계 (안타, 득점, 수비, 쿠키)
+  const [classStats, setClassStats] = useState({}); // { [className]: { totalHits, totalRuns, totalDefense, totalCookie } }
+  const [loadingStats, setLoadingStats] = useState(false);
+
+  // 팀 통계 (안타, 득점, 수비, 쿠키, 배지)
+  const [teamStats, setTeamStats] = useState({}); // { [teamId]: { totalHits, totalRuns, totalDefense, totalCookie, totalBadges } }
+  const [loadingTeamStats, setLoadingTeamStats] = useState(false);
+
+  // 학생 히스토리 모달
+  const [showStudentHistoryModal, setShowStudentHistoryModal] = useState(false);
+  const [selectedStudentForHistory, setSelectedStudentForHistory] = useState(null);
+
+  // 개별 학생 통계 (선택된 학급의 학생들만)
+  const [studentStats, setStudentStats] = useState({});
+  const [loadingStudentStats, setLoadingStudentStats] = useState(false);
+
+  // Optimistic Update: 드래그 후 임시 순서 저장
+  const [reorderedStudents, setReorderedStudents] = useState(null); // { className: [...students] }
+
+  // 드래그 중 실시간 순서 변경
+  const [activeStudentId, setActiveStudentId] = useState(null);
+
+  // 드래그 작업이 진행 중인지 추적
+  const [isDragging, setIsDragging] = useState(false);
+
+  // 이전 students 값을 추적 (실제 변경 감지용)
+  const prevStudentsRef = useRef(students);
+
+  // 학급 변경 시 reorderedStudents 초기화
+  useEffect(() => {
+    setReorderedStudents(null);
+  }, [selectedClass]);
+
+  // Firestore에서 students 업데이트 시 reorderedStudents 초기화 (드래그 중이 아니고, students가 실제로 변경되었을 때만)
+  useEffect(() => {
+    // students 배열의 실제 변경 여부 확인 (순서 변경 포함)
+    const studentsChanged = JSON.stringify(prevStudentsRef.current.map(s => ({ id: s.id, number: s.number })))
+      !== JSON.stringify(students.map(s => ({ id: s.id, number: s.number })));
+
+    if (!isDragging && reorderedStudents && studentsChanged) {
+      // Firestore 업데이트가 완료되었으므로 로컬 상태 초기화
+      console.log('🔄 [DnD] Firestore 업데이트 감지, reorderedStudents 초기화');
+      setReorderedStudents(null);
+    }
+
+    prevStudentsRef.current = students;
+  }, [students, isDragging, reorderedStudents]);
 
   // ============================================
   // 학급별 학생 그룹화 (classes 컬렉션 사용)
@@ -451,6 +694,118 @@ export default function ClassTeamManagementView() {
       console.log('ℹ️ selectedTeam이 없음 (아직 선택 안 함)');
     }
   }, [teams]);
+
+  // ============================================
+  // 학급 통계 로드
+  // ============================================
+  useEffect(() => {
+    if (user?.uid && activeTab === 'class') {
+      loadClassStats();
+    }
+  }, [user?.uid, activeTab, students]); // students가 변경될 때마다 재계산
+
+  const loadClassStats = async () => {
+    if (!user?.uid) return;
+
+    setLoadingStats(true);
+    try {
+      console.log('📊 [ClassTeamManagement] 학급 통계 로드 시작');
+      const stats = await calculateAllClassStats(user.uid);
+      setClassStats(stats);
+      console.log('✅ [ClassTeamManagement] 학급 통계 로드 완료:', stats);
+    } catch (error) {
+      console.error('❌ [ClassTeamManagement] 학급 통계 로드 실패:', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  // ============================================
+  // 팀 통계 로드 (모든 팀의 스탯 합산)
+  // ============================================
+  useEffect(() => {
+    if (user?.uid && activeTab === 'team' && teams.length > 0) {
+      loadTeamStats();
+    }
+  }, [user?.uid, activeTab, teams]); // teams가 변경될 때마다 재계산
+
+  const loadTeamStats = async () => {
+    if (!user?.uid) return;
+
+    setLoadingTeamStats(true);
+    try {
+      console.log('📊 [ClassTeamManagement] 팀 통계 로드 시작');
+      const stats = await calculateAllTeamStats(user.uid, teams);
+      setTeamStats(stats);
+      console.log('✅ [ClassTeamManagement] 팀 통계 로드 완료:', stats);
+    } catch (error) {
+      console.error('❌ [ClassTeamManagement] 팀 통계 로드 실패:', error);
+    } finally {
+      setLoadingTeamStats(false);
+    }
+  };
+
+  // ============================================
+  // 개별 학생 통계 로드 (선택된 학급의 학생들)
+  // ============================================
+  useEffect(() => {
+    if (user?.uid && selectedClass && studentsByClass[selectedClass]) {
+      loadStudentStats();
+    }
+  }, [user?.uid, selectedClass, studentsByClass]);
+
+  const loadStudentStats = async () => {
+    if (!user?.uid || !selectedClass) return;
+
+    const studentsInClass = studentsByClass[selectedClass];
+    if (!studentsInClass || studentsInClass.length === 0) {
+      setStudentStats({});
+      return;
+    }
+
+    setLoadingStudentStats(true);
+    try {
+      console.log(`📊 [ClassTeamManagement] ${selectedClass} 학생 통계 로드 시작`);
+      const stats = await calculateStudentStats(user.uid, studentsInClass);
+      setStudentStats(stats);
+      console.log(`✅ [ClassTeamManagement] ${selectedClass} 학생 통계 로드 완료`);
+    } catch (error) {
+      console.error('❌ [ClassTeamManagement] 학생 통계 로드 실패:', error);
+    } finally {
+      setLoadingStudentStats(false);
+    }
+  };
+
+  // ============================================
+  // 팀 탭: 선택된 팀의 선수들 통계 로드
+  // ============================================
+  useEffect(() => {
+    if (user?.uid && activeTab === 'team' && selectedTeam?.players && selectedTeam.players.length > 0) {
+      loadTeamPlayerStats();
+    }
+  }, [user?.uid, activeTab, selectedTeam]);
+
+  const loadTeamPlayerStats = async () => {
+    if (!user?.uid || !selectedTeam?.players) return;
+
+    const teamPlayers = selectedTeam.players;
+    if (teamPlayers.length === 0) {
+      setStudentStats({});
+      return;
+    }
+
+    setLoadingStudentStats(true);
+    try {
+      console.log(`📊 [ClassTeamManagement] ${selectedTeam.name} 선수 통계 로드 시작`);
+      const stats = await calculateStudentStats(user.uid, teamPlayers);
+      setStudentStats(stats);
+      console.log(`✅ [ClassTeamManagement] ${selectedTeam.name} 선수 통계 로드 완료`);
+    } catch (error) {
+      console.error('❌ [ClassTeamManagement] 팀 선수 통계 로드 실패:', error);
+    } finally {
+      setLoadingStudentStats(false);
+    }
+  };
 
   // ============================================
   // 팀 네비게이션
@@ -645,8 +1000,8 @@ export default function ClassTeamManagementView() {
         id: student.id,
         name: student.name,
         className: student.className,
-        number: index + 1,
-        battingOrder: index + 1,
+        number: student.number, // 학생의 실제 학급 번호 사용
+        battingOrder: index + 1, // 타순은 선택 순서대로
         // 사용자가 선택한 포지션이 있으면 사용, 없으면 자동 배정
         position: playerPositions[student.id] || POSITIONS[index % POSITIONS.length],
       }));
@@ -764,7 +1119,7 @@ export default function ClassTeamManagementView() {
         id: student.id,
         name: student.name,
         className: student.className,
-        number: currentPlayers.length + index + 1,
+        number: student.number, // 학생의 실제 학급 번호 사용
       }));
 
       await updateTeam(selectedTeam.id, {
@@ -813,6 +1168,21 @@ export default function ClassTeamManagementView() {
       setShowAddPlayerModal(false);
     } catch (error) {
       alert('선수 추가에 실패했습니다: ' + error.message);
+    }
+  };
+
+  // ============================================
+  // 학급 이름 수정
+  // ============================================
+  const handleUpdateClassName = async (classId, newName) => {
+    if (!user?.uid || !classId || !newName.trim()) return;
+
+    try {
+      const classRef = doc(db, 'users', user.uid, 'classes', classId);
+      await updateDoc(classRef, { name: newName.trim() });
+      console.log(`✅ 학급 이름 업데이트: ${classId} -> ${newName}`);
+    } catch (error) {
+      console.error('❌ 학급 이름 업데이트 실패:', error);
     }
   };
 
@@ -1082,6 +1452,93 @@ export default function ClassTeamManagementView() {
     }
   };
 
+  // 학생 드래그 시작 핸들러
+  const handleStudentDragStart = (event) => {
+    setActiveStudentId(event.active.id);
+    setIsDragging(true);
+    console.log('🎯 [DnD] 드래그 시작:', event.active.id);
+  };
+
+  // 학생 드래그 중 핸들러 (실시간 순서 변경)
+  const handleStudentDragOver = (event) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    if (!selectedClass || !studentsByClass[selectedClass]) {
+      return;
+    }
+
+    // 현재 표시 중인 학생 목록 (reorderedStudents가 있으면 사용)
+    const currentStudents = reorderedStudents?.[selectedClass] || studentsByClass[selectedClass];
+
+    const oldIndex = currentStudents.findIndex((s) => s.id === active.id);
+    const newIndex = currentStudents.findIndex((s) => s.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) {
+      return;
+    }
+
+    // 즉시 순서 변경 (애니메이션 효과)
+    const newOrderedStudents = arrayMove(currentStudents, oldIndex, newIndex);
+
+    console.log('🔄 [DnD] 순서 변경:', { oldIndex, newIndex, activeId: active.id, overId: over.id });
+
+    setReorderedStudents({
+      ...reorderedStudents,
+      [selectedClass]: newOrderedStudents
+    });
+  };
+
+  // 학생 드래그 종료 핸들러 (Firestore 업데이트)
+  const handleStudentDragEnd = async (event) => {
+    const { active, over } = event;
+
+    setActiveStudentId(null);
+    console.log('🏁 [DnD] 드래그 종료', { activeId: active.id, overId: over?.id, hasReordered: !!reorderedStudents?.[selectedClass] });
+
+    if (!selectedClass || !studentsByClass[selectedClass]) {
+      setReorderedStudents(null);
+      setIsDragging(false);
+      return;
+    }
+
+    // 핵심 변경: reorderedStudents가 있으면 순서 변경이 있었다고 판단 (onDragOver에서 이미 변경됨)
+    const currentStudents = reorderedStudents?.[selectedClass];
+
+    if (!currentStudents) {
+      // reorderedStudents가 없으면 순서 변경이 없었음
+      console.log('⏭️ [DnD] 순서 변경 없음 (reorderedStudents 없음)');
+      setIsDragging(false);
+      return;
+    }
+
+    // ⚡ 핵심 개선: 즉시 드래그 종료 처리 (UI 즉시 반영)
+    setIsDragging(false);
+    console.log('💾 [DnD] Firestore 업데이트 시작...', currentStudents.map(s => s.name));
+
+    // Firestore 업데이트 (백그라운드에서 실행)
+    const updatePromises = currentStudents.map((student, index) =>
+      updateStudent(student.id, { number: index + 1 })
+    );
+
+    // 백그라운드에서 업데이트 실행 (UI 블로킹 없음)
+    Promise.all(updatePromises)
+      .then(() => {
+        console.log('✅ [DnD] Firestore 업데이트 완료');
+        // useEffect가 students 변경을 감지하고 reorderedStudents를 자동으로 초기화함
+      })
+      .catch((error) => {
+        console.error('❌ 학생 순서 변경 실패:', error);
+        alert('학생 순서 변경에 실패했습니다: ' + error.message);
+        // 실패 시 롤백 (페이지 새로고침)
+        setReorderedStudents(null);
+        window.location.reload();
+      });
+  };
+
   // ============================================
   // 공유 시스템 핸들러 (Phase 2)
   // ============================================
@@ -1140,10 +1597,10 @@ export default function ClassTeamManagementView() {
       {/* ============================================ */}
       <div className="flex justify-between items-center border-b-2 border-gray-200">
         {/* 탭 버튼들 */}
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <button
             onClick={() => setActiveTab('class')}
-            className={`px-6 py-3 font-semibold text-sm transition-all ${
+            className={`px-8 py-4 font-bold text-base transition-all ${
               activeTab === 'class'
                 ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50/50'
                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
@@ -1153,7 +1610,7 @@ export default function ClassTeamManagementView() {
           </button>
           <button
             onClick={() => setActiveTab('team')}
-            className={`px-6 py-3 font-semibold text-sm transition-all ${
+            className={`px-8 py-4 font-bold text-base transition-all ${
               activeTab === 'team'
                 ? 'border-b-2 border-purple-500 text-purple-600 bg-purple-50/50'
                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
@@ -1163,7 +1620,7 @@ export default function ClassTeamManagementView() {
           </button>
           <button
             onClick={() => setActiveTab('shared')}
-            className={`px-6 py-3 font-semibold text-sm transition-all ${
+            className={`px-8 py-4 font-bold text-base transition-all ${
               activeTab === 'shared'
                 ? 'border-b-2 border-green-500 text-green-600 bg-green-50/50'
                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
@@ -1174,38 +1631,38 @@ export default function ClassTeamManagementView() {
         </div>
 
         {/* 우측 액션 버튼들 */}
-        <div className="flex gap-2 pr-4">
+        <div className="flex gap-3 pr-4">
           {/* 현재 탭에 따라 추가 버튼 표시 */}
           {activeTab === 'class' && (
             <Button
-              size="sm"
-              className="bg-green-100 text-green-700 hover:bg-green-200"
+              size="default"
+              className="bg-green-100 text-green-700 hover:bg-green-200 font-semibold"
               onClick={() => setShowAddClassModal(true)}
             >
-              <Plus className="w-4 h-4 mr-1" />
+              <Plus className="w-5 h-5 mr-1" />
               새 학급
             </Button>
           )}
           {activeTab === 'team' && (
             <Button
-              size="sm"
-              className="bg-green-100 text-green-700 hover:bg-green-200"
+              size="default"
+              className="bg-green-100 text-green-700 hover:bg-green-200 font-semibold"
               onClick={() => setShowAddTeamModal(true)}
             >
-              <Plus className="w-4 h-4 mr-1" />
+              <Plus className="w-5 h-5 mr-1" />
               새 팀
             </Button>
           )}
           <Button
-            size="sm"
+            size="default"
             variant="outline"
             onClick={() => setShowShareSettingsModal(true)}
-            className="border-purple-300 text-purple-700 hover:bg-purple-50"
+            className="border-purple-300 text-purple-700 hover:bg-purple-50 font-semibold"
           >
             🤝 공유하기
           </Button>
           <Button
-            size="sm"
+            size="default"
             variant="outline"
             onClick={() => {
               // 전체 항목 관리를 위해 특별한 플래그 설정
@@ -1216,7 +1673,7 @@ export default function ClassTeamManagementView() {
               });
               setShowShareManagementModal(true);
             }}
-            className="border-blue-300 text-blue-700 hover:bg-blue-50"
+            className="border-blue-300 text-blue-700 hover:bg-blue-50 font-semibold"
           >
             ⚙️ 공유 관리
           </Button>
@@ -1227,7 +1684,7 @@ export default function ClassTeamManagementView() {
       {/* 학급 관리 탭 */}
       {/* ============================================ */}
       {activeTab === 'class' && (
-        <div className="flex-1 flex flex-col gap-3 bg-blue-50/30 rounded-lg p-3">
+        <div className="flex-1 flex flex-col gap-2 bg-blue-50/30 rounded-lg p-3">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-bold">학급 관리</h2>
@@ -1243,8 +1700,8 @@ export default function ClassTeamManagementView() {
           <div className="flex gap-2">
             {isClassEditMode ? (
               <Button
-                size="sm"
-                className="bg-sky-200 text-sky-700 hover:bg-sky-300"
+                size="default"
+                className="bg-sky-200 text-sky-700 hover:bg-sky-300 font-semibold"
                 onClick={() => setIsClassEditMode(false)}
               >
                 완료
@@ -1252,9 +1709,10 @@ export default function ClassTeamManagementView() {
             ) : (
               <>
                 <Button
-                  size="sm"
+                  size="default"
                   variant="outline"
                   onClick={() => setIsClassEditMode(true)}
+                  className="font-semibold"
                 >
                   편집
                 </Button>
@@ -1297,13 +1755,99 @@ export default function ClassTeamManagementView() {
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
-                <div className="flex items-center justify-center gap-2 text-base">
-                  <span className="font-bold text-foreground text-lg">{className}</span>
+
+                {/* 1행: 학급명 | 인원 | 총점 */}
+                <div className="flex items-center justify-center gap-2 text-base mb-2">
+                  {isClassEditMode && editingClassName === className ? (
+                    <input
+                      type="text"
+                      value={tempClassName}
+                      onChange={(e) => setTempClassName(e.target.value)}
+                      onBlur={async () => {
+                        const classObj = classes.find(c => c.name === className);
+                        if (classObj && tempClassName.trim()) {
+                          await handleUpdateClassName(classObj.id, tempClassName);
+                        }
+                        setEditingClassName(null);
+                        setTempClassName('');
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.target.blur();
+                        } else if (e.key === 'Escape') {
+                          setEditingClassName(null);
+                          setTempClassName('');
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="font-bold text-foreground text-lg px-2 py-1 border-2 border-primary rounded text-center w-32"
+                      autoFocus
+                    />
+                  ) : (
+                    <span
+                      className={`font-bold text-foreground text-lg ${
+                        isClassEditMode ? 'cursor-text hover:text-primary' : ''
+                      }`}
+                      onClick={(e) => {
+                        if (isClassEditMode) {
+                          e.stopPropagation();
+                          setEditingClassName(className);
+                          setTempClassName(className);
+                        }
+                      }}
+                    >
+                      {className}
+                    </span>
+                  )}
                   <span className="text-muted-foreground">|</span>
                   <span className="text-sm text-muted-foreground">
                     {studentsByClass[className].length}명
                   </span>
+                  {classStats[className] && (
+                    <>
+                      <span className="text-muted-foreground">|</span>
+                      <span className="flex items-center gap-1" title="총점">
+                        <span className="text-base">📊</span>
+                        <span className="font-semibold text-base text-blue-600">
+                          {(classStats[className].totalHits || 0) +
+                           (classStats[className].totalRuns || 0) +
+                           (classStats[className].totalDefense || 0) +
+                           (classStats[className].totalCookie || 0)}
+                        </span>
+                      </span>
+                    </>
+                  )}
                 </div>
+
+                {/* 2행: 스탯별 점수 + 배지 */}
+                {classStats[className] && (
+                  <div className="flex items-center justify-center gap-3 text-base">
+                    <span className="flex items-center gap-1" title="안타">
+                      <span className="text-base">⚾</span>
+                      <span className="font-semibold text-base">{classStats[className].totalHits || 0}</span>
+                    </span>
+                    <span className="flex items-center gap-1" title="득점">
+                      <span className="text-base">🏃‍♂️</span>
+                      <span className="font-semibold text-base">{classStats[className].totalRuns || 0}</span>
+                    </span>
+                    <span className="flex items-center gap-1" title="수비">
+                      <span className="text-base">🛡️</span>
+                      <span className="font-semibold text-base">{classStats[className].totalDefense || 0}</span>
+                    </span>
+                    <span className="flex items-center gap-1" title="쿠키">
+                      <span className="text-base">🍪</span>
+                      <span className="font-semibold text-base">{classStats[className].totalCookie || 0}</span>
+                    </span>
+                    <span className="flex items-center gap-1" title="배지">
+                      <span className="text-base">🏆</span>
+                      <span className="font-semibold text-base text-yellow-600">
+                        {studentsByClass[className].reduce((sum, student) =>
+                          sum + (student.badges?.length || 0), 0
+                        )}
+                      </span>
+                    </span>
+                  </div>
+                )}
               </Card>
             ))}
 
@@ -1346,98 +1890,125 @@ export default function ClassTeamManagementView() {
 
         {/* 선택된 학급 학생 목록 (하단) */}
         {selectedClass ? (
-          <Card className="p-4 max-h-[calc(100vh-16rem)] overflow-y-auto">
+          <Card className="p-4 flex flex-col max-h-[calc(100vh-16rem)]">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-foreground">{selectedClass} 학생 목록</h3>
               <Button
-                size="sm"
+                size="default"
                 variant="outline"
                 onClick={() => handleOpenAddStudents(selectedClass)}
+                className="font-semibold"
               >
-                <Plus className="w-4 h-4 mr-1" />
+                <Plus className="w-5 h-5 mr-1" />
                 학생 추가
               </Button>
             </div>
 
-            {/* 학생 목록 (4열 그리드로 카드 크기 확대) */}
-            <div className="grid grid-cols-4 gap-3">
-              {(studentsByClass[selectedClass] || []).map((student) => (
-                  <div
-                    key={student.id}
-                    className={`
-                      relative py-3 px-3 rounded-lg border-2 text-xs font-medium transition-all
-                      ${
-                        selectedStudents.includes(student.id)
-                          ? 'bg-primary/10 border-primary text-primary'
-                          : 'bg-card border-border hover:border-primary/50'
-                      }
-                    `}
-                  >
-                    <button
-                      onClick={() => toggleStudentSelection(student.id)}
-                      className="w-full flex flex-col items-center justify-center gap-2.5"
-                    >
-                      {/* 첫 번째 줄: 성별 + 배지 */}
-                      <div className="flex items-center justify-center gap-2 w-full">
-                        {/* 성별 아이콘 */}
-                        <span className="text-2xl">
-                          {student.gender === 'male' ? '👨‍🎓' : student.gender === 'female' ? '👩‍🎓' : '👨‍🎓'}
-                        </span>
+            {/* 학생 목록 (4열 그리드로 카드 크기 확대, 16명 초과 시 스크롤, 드래그 앤 드롭 지원) */}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleStudentDragStart}
+              onDragOver={handleStudentDragOver}
+              onDragEnd={handleStudentDragEnd}
+            >
+              <SortableContext
+                items={(() => {
+                  // Optimistic Update: reorderedStudents가 있으면 사용, 없으면 정렬된 studentsByClass 사용
+                  const studentsToDisplay = reorderedStudents?.[selectedClass] || studentsByClass[selectedClass] || [];
 
-                        {/* 배지 표시 */}
-                        <PlayerBadgeDisplay
-                          player={student}
-                          maxBadges={3}
-                          size="md"
-                          showEmpty={false}
-                          showOverflow={true}
-                        />
-                      </div>
+                  // reorderedStudents가 있으면 이미 정렬되어 있으므로 정렬하지 않음
+                  if (reorderedStudents?.[selectedClass]) {
+                    return studentsToDisplay.map(s => s.id);
+                  }
 
-                      {/* 두 번째 줄: 이름 (크게) */}
-                      <div className="font-bold text-lg text-center w-full">
-                        {student.name}
-                      </div>
+                  // 그렇지 않으면 번호로 정렬
+                  return studentsToDisplay
+                    .sort((a, b) => {
+                      const numA = a.number || 999;
+                      const numB = b.number || 999;
+                      if (numA !== numB) return numA - numB;
+                      return (a.name || '').localeCompare(b.name || '');
+                    })
+                    .map(s => s.id);
+                })()}
+                strategy={rectSortingStrategy}
+              >
+                <div className="grid grid-cols-4 gap-3 overflow-y-auto max-h-[600px] pr-2 pt-2">
+                  {(() => {
+                    // Optimistic Update: reorderedStudents가 있으면 사용, 없으면 정렬된 studentsByClass 사용
+                    const studentsToDisplay = reorderedStudents?.[selectedClass] || studentsByClass[selectedClass] || [];
 
-                      {/* 세 번째 줄: 통계 정보 */}
-                      <div className="text-sm text-muted-foreground text-center w-full">
-                        {student.badges && student.badges.length > 0
-                          ? `🏆 배지 ${student.badges.length}개`
-                          : '경기 기록 없음'
-                        }
-                      </div>
-                    </button>
-                    {isClassEditMode && (
-                      <div className="flex justify-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const newGender = student.gender === 'male' ? 'female' : 'male';
-                            updateStudent(student.id, { gender: newGender });
-                          }}
-                          className="mt-1 text-[10px] px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 rounded text-blue-700 transition-colors"
-                          title="성별 변경"
-                        >
-                          {student.gender === 'male' ? '👨→👩' : '👩→👨'}
-                        </button>
-                      </div>
-                    )}
-                    {isClassEditMode && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenDeleteStudent(student);
-                        }}
-                        className="absolute -top-1 -right-1 bg-rose-200 text-rose-700 rounded-full p-0.5 hover:bg-rose-300 transition-colors"
-                        title="삭제"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
+                    // reorderedStudents가 있으면 이미 정렬되어 있으므로 정렬하지 않음
+                    const sortedStudents = reorderedStudents?.[selectedClass]
+                      ? studentsToDisplay
+                      : studentsToDisplay.sort((a, b) => {
+                          const numA = a.number || 999;
+                          const numB = b.number || 999;
+                          if (numA !== numB) return numA - numB;
+                          return (a.name || '').localeCompare(b.name || '');
+                        });
+
+                    return sortedStudents.map((student) => (
+                      <SortableStudentCard
+                        key={student.id}
+                        student={student}
+                        isClassEditMode={isClassEditMode}
+                        selectedStudents={selectedStudents}
+                        toggleStudentSelection={toggleStudentSelection}
+                        updateStudent={updateStudent}
+                        handleOpenDeleteStudent={handleOpenDeleteStudent}
+                        setSelectedStudentForHistory={setSelectedStudentForHistory}
+                        setShowStudentHistoryModal={setShowStudentHistoryModal}
+                        studentStats={studentStats}
+                        loadingStudentStats={loadingStudentStats}
+                      />
+                    ));
+                  })()}
+                </div>
+              </SortableContext>
+            </DndContext>
+
+            {/* 학급 전체 합계 */}
+            {selectedClass && classStats[selectedClass] && (
+              <div className="mt-4 pt-4 border-t-2 border-primary/20">
+                <div className="flex items-center justify-center gap-6 py-3 bg-blue-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">⚾</span>
+                    <span className="font-bold">{classStats[selectedClass].totalHits || 0}</span>
                   </div>
-                )
-              )}
-            </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🏃‍♂️</span>
+                    <span className="font-bold">{classStats[selectedClass].totalRuns || 0}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🛡️</span>
+                    <span className="font-bold">{classStats[selectedClass].totalDefense || 0}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🍪</span>
+                    <span className="font-bold">{classStats[selectedClass].totalCookie || 0}</span>
+                  </div>
+                  <div className="flex items-center gap-2 ml-4 pl-4 border-l-2 border-blue-300">
+                    <span className="text-lg">📊</span>
+                    <span className="font-bold text-blue-600">
+                      총점: {(classStats[selectedClass].totalHits || 0) +
+                             (classStats[selectedClass].totalRuns || 0) +
+                             (classStats[selectedClass].totalDefense || 0) +
+                             (classStats[selectedClass].totalCookie || 0)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🏆</span>
+                    <span className="font-bold text-yellow-600">
+                      배지: {studentsByClass[selectedClass].reduce((sum, student) =>
+                        sum + (student.badges?.length || 0), 0
+                      )}개
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </Card>
         ) : (
           <Card className="p-8 text-center text-muted-foreground">
@@ -1481,17 +2052,18 @@ export default function ClassTeamManagementView() {
             </label>
             {isTeamEditMode ? (
               <Button
-                size="sm"
-                className="bg-sky-200 text-sky-700 hover:bg-sky-300"
+                size="default"
+                className="bg-sky-200 text-sky-700 hover:bg-sky-300 font-semibold"
                 onClick={() => setIsTeamEditMode(false)}
               >
                 완료
               </Button>
             ) : (
               <Button
-                size="sm"
+                size="default"
                 variant="outline"
                 onClick={() => setIsTeamEditMode(true)}
+                className="font-semibold"
               >
                 편집
               </Button>
@@ -1534,9 +2106,64 @@ export default function ClassTeamManagementView() {
                   </button>
                 )}
                 <div className="flex flex-col items-center justify-center gap-1.5">
-                  {/* 첫 번째 줄: 팀 이름 | 인원 */}
+                  {/* 첫 번째 줄: 팀 이름 | 인원 | 총점 */}
                   <div className="flex items-center justify-center gap-2 text-base">
-                    <span className="font-bold text-foreground text-lg">{team.name}</span>
+                    {isTeamEditMode && editingTeamId === team.id && canEdit(team) ? (
+                      <input
+                        type="text"
+                        value={tempTeamName}
+                        onChange={(e) => setTempTeamName(e.target.value)}
+                        onBlur={async () => {
+                          if (tempTeamName.trim() && canEdit(team)) {
+                            await updateTeam(team.id, { name: tempTeamName });
+                          }
+                          setEditingTeamId(null);
+                          setTempTeamName('');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.target.blur();
+                          } else if (e.key === 'Escape') {
+                            setEditingTeamId(null);
+                            setTempTeamName('');
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-bold text-foreground text-lg px-2 py-1 border-2 border-primary rounded text-center w-32"
+                        autoFocus
+                      />
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`font-bold text-foreground text-lg ${
+                            isTeamEditMode && canEdit(team) ? 'cursor-text hover:text-primary' : ''
+                          }`}
+                          onClick={(e) => {
+                            if (isTeamEditMode && canEdit(team)) {
+                              e.stopPropagation();
+                              setEditingTeamId(team.id);
+                              setTempTeamName(team.name);
+                            }
+                          }}
+                        >
+                          {team.name}
+                        </span>
+                        {/* 편집 모드일 때 연필 아이콘 표시 */}
+                        {isTeamEditMode && canEdit(team) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingTeamId(team.id);
+                              setTempTeamName(team.name);
+                            }}
+                            className="p-1 hover:bg-primary/10 rounded transition-colors text-primary"
+                            title="팀 이름 수정"
+                          >
+                            ✏️
+                          </button>
+                        )}
+                      </div>
+                    )}
                     {isSharedItem(team) && (
                       <Badge variant="outline" className={`text-[10px] px-1.5 py-0.5 ${getPermissionBadgeInfo(team.permission).color}`}>
                         {getPermissionBadgeInfo(team.permission).icon}
@@ -1546,10 +2173,47 @@ export default function ClassTeamManagementView() {
                     <span className="text-sm text-muted-foreground">
                       {team.players?.length || 0}명
                     </span>
+                    <span className="text-muted-foreground">|</span>
+                    {/* 총점 */}
+                    {teamStats[team.id] && (
+                      <span className="font-bold text-base text-blue-600">
+                        📊 {(teamStats[team.id].totalHits || 0) +
+                             (teamStats[team.id].totalRuns || 0) +
+                             (teamStats[team.id].totalDefense || 0) +
+                             (teamStats[team.id].totalCookie || 0)}
+                      </span>
+                    )}
                   </div>
-                  {/* 두 번째 줄: 공유 정보 (있을 때만) */}
+
+                  {/* 두 번째 줄: 안타, 득점, 수비, 쿠키, 배지 */}
+                  {teamStats[team.id] && (
+                    <div className="flex items-center justify-center gap-2.5 text-sm">
+                      <span className="flex items-center gap-0.5" title="안타">
+                        <span>⚾</span>
+                        <span className="font-semibold">{teamStats[team.id].totalHits || 0}</span>
+                      </span>
+                      <span className="flex items-center gap-0.5" title="득점">
+                        <span>🏃‍♂️</span>
+                        <span className="font-semibold">{teamStats[team.id].totalRuns || 0}</span>
+                      </span>
+                      <span className="flex items-center gap-0.5" title="수비">
+                        <span>🛡️</span>
+                        <span className="font-semibold">{teamStats[team.id].totalDefense || 0}</span>
+                      </span>
+                      <span className="flex items-center gap-0.5" title="쿠키">
+                        <span>🍪</span>
+                        <span className="font-semibold">{teamStats[team.id].totalCookie || 0}</span>
+                      </span>
+                      <span className="flex items-center gap-0.5" title="배지">
+                        <span>🏆</span>
+                        <span className="font-semibold text-yellow-600">{teamStats[team.id].totalBadges || 0}</span>
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 공유 정보 (있을 때만) */}
                   {isSharedItem(team) && (
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-muted-foreground mt-1">
                       by {team.ownerName}
                     </div>
                   )}
@@ -1613,33 +2277,33 @@ export default function ClassTeamManagementView() {
                 {canEdit(selectedTeam) ? (
                   <>
                     <Button
-                      size="sm"
+                      size="default"
                       variant="outline"
                       onClick={handleRandomLineup}
-                      className="bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100"
+                      className="bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 font-semibold"
                       disabled={!selectedTeam.players || selectedTeam.players.length === 0}
                     >
                       🎲 랜덤 설정
                     </Button>
                     {canManage(selectedTeam) && (
                       <>
-                        <Button size="sm" variant="outline" onClick={handleOpenImportPlayers}>
-                          <Plus className="w-4 h-4 mr-1" />
+                        <Button size="default" variant="outline" onClick={handleOpenImportPlayers} className="font-semibold">
+                          <Plus className="w-5 h-5 mr-1" />
                           학급에서 가져오기
                         </Button>
-                        <Button size="sm" variant="outline" onClick={handleOpenAddPlayer}>
-                          <Plus className="w-4 h-4 mr-1" />
+                        <Button size="default" variant="outline" onClick={handleOpenAddPlayer} className="font-semibold">
+                          <Plus className="w-5 h-5 mr-1" />
                           새로 추가
                         </Button>
                       </>
                     )}
                     {isTeamEditMode && canManage(selectedTeam) && (
                       <Button
-                        size="sm"
-                        className="bg-rose-200 text-rose-700 hover:bg-rose-300"
+                        size="default"
+                        className="bg-rose-200 text-rose-700 hover:bg-rose-300 font-semibold"
                         onClick={() => handleDeleteTeam(selectedTeam)}
                       >
-                        <Trash2 className="w-4 h-4 mr-1" />
+                        <Trash2 className="w-5 h-5 mr-1" />
                         팀 삭제
                       </Button>
                     )}
@@ -1657,7 +2321,7 @@ export default function ClassTeamManagementView() {
             {selectedTeam.players && selectedTeam.players.length > 0 ? (
               <div className="space-y-2">
                 {/* 테이블 헤더 */}
-                <div className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_1fr_32px] gap-3 items-center px-1.5 py-2 bg-muted/30 rounded-lg text-sm font-semibold text-muted-foreground">
+                <div className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_2fr_1fr_32px] gap-3 items-center px-1.5 py-2 bg-muted/30 rounded-lg text-base font-bold text-muted-foreground">
                   <div className="text-center w-6">
                     <GripVertical className="w-4 h-4 mx-auto text-muted-foreground" />
                   </div>
@@ -1666,6 +2330,7 @@ export default function ClassTeamManagementView() {
                   <div className="text-center">이름</div>
                   <div className="text-center">학급</div>
                   <div className="text-center">번호</div>
+                  <div className="text-center">스탯</div>
                   <div className="text-center">포지션</div>
                   <div className="w-8"></div>
                 </div>
@@ -1687,11 +2352,51 @@ export default function ClassTeamManagementView() {
                           onChangePosition={handleChangePosition}
                           onRemove={handleRemovePlayerFromTeam}
                           students={students}
+                          studentStats={studentStats}
                         />
                       ))}
                     </div>
                   </SortableContext>
                 </DndContext>
+
+                {/* 팀 전체 합계 */}
+                {selectedTeam && teamStats[selectedTeam.id] && (
+                  <div className="mt-4 pt-4 border-t-2 border-primary/20">
+                    <div className="flex items-center justify-center gap-6 py-3 bg-blue-50 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">⚾</span>
+                        <span className="font-bold">{teamStats[selectedTeam.id].totalHits || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🏃‍♂️</span>
+                        <span className="font-bold">{teamStats[selectedTeam.id].totalRuns || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🛡️</span>
+                        <span className="font-bold">{teamStats[selectedTeam.id].totalDefense || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🍪</span>
+                        <span className="font-bold">{teamStats[selectedTeam.id].totalCookie || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-2 ml-4 pl-4 border-l-2 border-blue-300">
+                        <span className="text-lg">📊</span>
+                        <span className="font-bold text-blue-600">
+                          총점: {(teamStats[selectedTeam.id].totalHits || 0) +
+                                 (teamStats[selectedTeam.id].totalRuns || 0) +
+                                 (teamStats[selectedTeam.id].totalDefense || 0) +
+                                 (teamStats[selectedTeam.id].totalCookie || 0)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🏆</span>
+                        <span className="font-bold text-yellow-600">
+                          배지: {teamStats[selectedTeam.id].totalBadges || 0}개
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center text-muted-foreground py-12">
@@ -2397,6 +3102,18 @@ export default function ClassTeamManagementView() {
         teamId={manageShareItem?.type === 'team' ? manageShareItem.id : null}
         itemType={manageShareItem?.type}
         itemName={manageShareItem?.name}
+      />
+
+      {/* 학생 히스토리 모달 */}
+      <StudentHistoryModal
+        isOpen={showStudentHistoryModal}
+        onClose={() => {
+          setShowStudentHistoryModal(false);
+          setSelectedStudentForHistory(null);
+        }}
+        student={selectedStudentForHistory}
+        teacherId={user?.uid}
+        maxGames={3}
       />
     </div>
   );

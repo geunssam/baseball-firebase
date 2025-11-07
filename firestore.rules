@@ -198,6 +198,12 @@ service cloud.firestore {
         allow read: if isSignedIn();  // 모든 로그인 유저가 볼 수 있음
         allow write: if isOwner(userId);  // 본인만 수정
       }
+
+      // 쿠키 수여 기록
+      match /cookieAwards/{awardId} {
+        allow read: if isOwner(userId);  // 본인의 쿠키 수여 기록만 조회
+        allow write: if isOwner(userId);  // 본인만 쿠키 수여 가능
+      }
     }
 
     // ============================================
