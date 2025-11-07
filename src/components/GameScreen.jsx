@@ -23,6 +23,7 @@ import PlayerBadgeOrderModal from './PlayerBadgeOrderModal';
 import StudentCodeListModal from './StudentCodeListModal';
 import GameEndModal from './GameEndModal';
 import CookieAwardModal from './CookieAwardModal';
+import AddInningsModal from './AddInningsModal';
 import { checkNewBadges, calculatePlayerTotalStats, BADGES } from '../utils/badgeSystem';
 import { getNextBadgesProgress } from '../utils/badgeProgress';
 import {
@@ -207,6 +208,7 @@ const GameScreen = ({ gameId, onExit }) => {
   // 쿠키 수여 모달 상태
   const [showCookieModal, setShowCookieModal] = useState(false);
   const [selectedPlayerForCookie, setSelectedPlayerForCookie] = useState(null); // { player, isTeamA, playerIndex }
+  const [showAddInningsModal, setShowAddInningsModal] = useState(false);
 
   // ✅ 선수 ID로 최신 선수 정보 동적 조회 (game 상태가 업데이트되면 자동으로 최신 값 반영)
   const getPlayerById = (playerId) => {
@@ -1012,21 +1014,62 @@ const GameScreen = ({ gameId, onExit }) => {
     }
   };
 
-  // 이닝 추가 핸들러
-  const handleAddInning = async (count = 1) => {
+  // 이닝 추가 모달 열기
+  const handleAddInning = () => {
     if (!checkEditPermission()) return;
-    if (!confirm(`이닝을 ${count}회 추가하시겠습니까?`)) return;
+    setShowAddInningsModal(true);
+  };
+
+  // 이닝 추가 확인 (모달에서 호출)
+  const handleConfirmAddInnings = async (count, inningLineups) => {
+    if (!checkEditPermission()) return;
 
     try {
+      console.log('🔄 이닝 추가 시작:', { count, inningLineups });
+
       const newGame = { ...game };
+
+      // 1. 이닝 수 증가 및 스코어보드 확장
       for (let i = 0; i < count; i++) {
         newGame.innings++;
         newGame.scoreBoard.teamA.push(0);
         newGame.scoreBoard.teamB.push(0);
       }
 
+      // 2. inningLineups 업데이트
+      for (const [inning, teamsConfig] of Object.entries(inningLineups)) {
+        const inningNum = parseInt(inning);
+
+        // 공격팀 (팀 A) 설정
+        if (teamsConfig.offense) {
+          if (!newGame.teamA.inningLineups) {
+            newGame.teamA.inningLineups = {};
+          }
+          newGame.teamA.inningLineups[inningNum] = {
+            teamId: teamsConfig.offense.teamId,
+            teamName: teamsConfig.offense.teamName,
+            playerCount: teamsConfig.offense.playerCount
+          };
+          console.log(`  ✅ ${inningNum}회 공격팀 설정:`, teamsConfig.offense.teamName);
+        }
+
+        // 수비팀 (팀 B) 설정
+        if (teamsConfig.defense) {
+          if (!newGame.teamB.inningLineups) {
+            newGame.teamB.inningLineups = {};
+          }
+          newGame.teamB.inningLineups[inningNum] = {
+            teamId: teamsConfig.defense.teamId,
+            teamName: teamsConfig.defense.teamName,
+            playerCount: teamsConfig.defense.playerCount
+          };
+          console.log(`  ✅ ${inningNum}회 수비팀 설정:`, teamsConfig.defense.teamName);
+        }
+      }
+
       await updateGame(game.id, newGame);
-      alert(`✅ 이닝이 추가되었습니다! (총 ${newGame.innings}회)`);
+      console.log('✅ 이닝 추가 완료:', { totalInnings: newGame.innings });
+      alert(`✅ ${count}개 이닝이 추가되었습니다! (총 ${newGame.innings}회)`);
     } catch (error) {
       console.error('❌ 이닝 추가 실패:', error);
       alert('❌ 이닝 추가에 실패했습니다.');
@@ -3744,6 +3787,15 @@ const GameScreen = ({ gameId, onExit }) => {
           className: selectedPlayerForCookie.player.className || '알 수 없음',
           number: selectedPlayerForCookie.player.battingOrder || selectedPlayerForCookie.playerIndex + 1
         } : null}
+      />
+
+      {/* 이닝 추가 모달 */}
+      <AddInningsModal
+        open={showAddInningsModal}
+        onOpenChange={setShowAddInningsModal}
+        teams={teams}
+        currentInnings={game?.innings || 0}
+        onConfirm={handleConfirmAddInnings}
       />
     </div>
   );
