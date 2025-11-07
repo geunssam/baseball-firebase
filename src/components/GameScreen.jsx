@@ -710,9 +710,20 @@ const GameScreen = ({ gameId, onExit }) => {
         currentInning: newInning,
       };
 
+      // 🔍 디버깅: inningLineups 데이터 확인
+      console.log('🔍 === 이닝 변경 디버깅 시작 ===');
+      console.log('현재 이닝:', game.currentInning, '→ 새 이닝:', newInning);
+      console.log('teamA.inningLineups 전체:', game.teamA.inningLineups);
+      console.log('teamB.inningLineups 전체:', game.teamB.inningLineups);
+      console.log('사용 가능한 teams 수:', teams.length);
+      console.log('teams:', teams.map(t => ({ id: t.id, name: t.name, players: t.players?.length })));
+
       // 이닝별 라인업 설정 확인 및 자동 교체
       const teamAConfig = game.teamA.inningLineups?.[newInning];
       const teamBConfig = game.teamB.inningLineups?.[newInning];
+
+      console.log(`${newInning}회 teamAConfig:`, teamAConfig);
+      console.log(`${newInning}회 teamBConfig:`, teamBConfig);
 
       if (teamAConfig || teamBConfig) {
         console.log(`🔄 ${newInning}회 라인업 자동 교체 시작...`);

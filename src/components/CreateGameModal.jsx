@@ -243,8 +243,20 @@ const CreateGameModal = ({
     const inningLineupsA = {};
     const inningLineupsB = {};
 
+    console.log('🔍 === 경기 생성 시 이닝별 팀 설정 ===');
+    console.log('총 이닝 수:', innings);
+    console.log('inningTeams 전체:', inningTeams);
+    console.log('1회 (기준) - 공격:', firstInning.offense.teamName, '/ 수비:', firstInning.defense.teamName);
+
     for (let i = 1; i <= innings; i++) {
       const inning = inningTeams[i];
+
+      console.log(`${i}회:`, {
+        offense: inning.offense?.teamName,
+        offenseId: inning.offense?.teamId,
+        defense: inning.defense?.teamName,
+        defenseId: inning.defense?.teamId
+      });
 
       // 공격팀이 teamA인 경우
       if (inning.offense.teamId !== firstInning.offense.teamId) {
@@ -255,6 +267,7 @@ const CreateGameModal = ({
           teamName: newTeam.name,
           playerCount: newTeam.players?.length || 0
         };
+        console.log(`  ✅ ${i}회 공격팀 교체 필요 → inningLineupsA[${i}]:`, inningLineupsA[i]);
       }
 
       // 수비팀이 teamB인 경우
@@ -266,8 +279,12 @@ const CreateGameModal = ({
           teamName: newTeam.name,
           playerCount: newTeam.players?.length || 0
         };
+        console.log(`  ✅ ${i}회 수비팀 교체 필요 → inningLineupsB[${i}]:`, inningLineupsB[i]);
       }
     }
+
+    console.log('📦 최종 inningLineupsA:', inningLineupsA);
+    console.log('📦 최종 inningLineupsB:', inningLineupsB);
 
     onCreateGame(processedTeamA, processedTeamB, innings, {
       ...options,
