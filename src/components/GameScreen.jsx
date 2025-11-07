@@ -3852,6 +3852,7 @@ const GameScreen = ({ gameId, onExit }) => {
         onOpenChange={setShowAddInningsModal}
         teams={teams}
         currentInnings={game?.innings || 0}
+        initialCount={inningCountInput}
         onConfirm={handleConfirmAddInnings}
       />
     </div>

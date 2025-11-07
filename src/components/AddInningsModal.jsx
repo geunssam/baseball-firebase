@@ -15,18 +15,19 @@ const AddInningsModal = ({
   onOpenChange,
   teams,
   currentInnings,
+  initialCount = 1,
   onConfirm
 }) => {
-  const [addCount, setAddCount] = useState(1); // 추가할 이닝 수
+  const [addCount, setAddCount] = useState(initialCount); // 추가할 이닝 수
   const [inningTeams, setInningTeams] = useState({}); // { [inning]: { offense: teamId, defense: teamId } }
 
   // 모달이 열릴 때 초기화
   useEffect(() => {
     if (open) {
-      setAddCount(1);
+      setAddCount(initialCount);
       setInningTeams({});
     }
-  }, [open]);
+  }, [open, initialCount]);
 
   // 추가할 이닝 수가 변경되면 inningTeams 초기화
   useEffect(() => {
