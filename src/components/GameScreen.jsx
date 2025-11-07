@@ -6,7 +6,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 import { Input } from './ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from './ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -209,6 +209,11 @@ const GameScreen = ({ gameId, onExit }) => {
   const [showCookieModal, setShowCookieModal] = useState(false);
   const [selectedPlayerForCookie, setSelectedPlayerForCookie] = useState(null); // { player, isTeamA, playerIndex }
   const [showAddInningsModal, setShowAddInningsModal] = useState(false);
+
+  // 선수 삭제 관련 상태
+  const [showDeletePlayerModal, setShowDeletePlayerModal] = useState(false); // 삭제 확인 모달
+  const [showDeleteOptionsModal, setShowDeleteOptionsModal] = useState(false); // 기록 삭제 옵션 모달
+  const [deletingPlayerInfo, setDeletingPlayerInfo] = useState(null); // { index, team: 'attack'|'defense', player }
 
   // ✅ 선수 ID로 최신 선수 정보 동적 조회 (game 상태가 업데이트되면 자동으로 최신 값 반영)
   const getPlayerById = (playerId) => {
@@ -1410,6 +1415,152 @@ const GameScreen = ({ gameId, onExit }) => {
     }
   };
 
+  // ============================================================
+  // 선수 삭제 관련 함수
+  // ============================================================
+
+  // 공격팀 선수 삭제 시작
+  const handleDeleteAttackPlayer = (playerIndex) => {
+    if (!tempAttackLineup || tempAttackLineup.length <= 1) {
+      alert('⚠️ 최소 1명의 선수는 남아있어야 합니다.');
+      return;
+    }
+
+    const player = tempAttackLineup[playerIndex];
+    setDeletingPlayerInfo({
+      index: playerIndex,
+      team: 'attack',
+      player: player
+    });
+    setShowDeletePlayerModal(true);
+  };
+
+  // 수비팀 선수 삭제 시작
+  const handleDeleteDefensePlayer = (playerIndex) => {
+    if (!tempDefenseLineup || tempDefenseLineup.length <= 1) {
+      alert('⚠️ 최소 1명의 선수는 남아있어야 합니다.');
+      return;
+    }
+
+    const player = tempDefenseLineup[playerIndex];
+    setDeletingPlayerInfo({
+      index: playerIndex,
+      team: 'defense',
+      player: player
+    });
+    setShowDeletePlayerModal(true);
+  };
+
+  // 첫 번째 모달: 삭제 확인
+  const handleConfirmDelete = () => {
+    if (!deletingPlayerInfo) return;
+
+    const { player } = deletingPlayerInfo;
+
+    // 선수에게 기록이 있는지 확인
+    const hasRecords = (player.stats?.hits || 0) > 0
+      || (player.stats?.runs || 0) > 0
+      || (player.stats?.bonusCookie || 0) > 0
+      || (player.stats?.goodDefense || 0) > 0;
+
+    if (hasRecords) {
+      // 기록이 있으면 두 번째 모달 표시
+      setShowDeletePlayerModal(false);
+      setShowDeleteOptionsModal(true);
+    } else {
+      // 기록이 없으면 바로 삭제
+      executeDeletePlayer(false);
+    }
+  };
+
+  // 두 번째 모달: 기록 삭제 옵션 선택 후 실제 삭제
+  const handleDeleteWithOptions = (deleteRecords) => {
+    executeDeletePlayer(deleteRecords);
+  };
+
+  // 실제 삭제 실행
+  const executeDeletePlayer = (deleteRecords) => {
+    if (!deletingPlayerInfo) return;
+
+    const { index, team, player } = deletingPlayerInfo;
+
+    if (team === 'attack') {
+      // 공격팀 라인업에서 제거
+      const newLineup = tempAttackLineup.filter((_, i) => i !== index);
+
+      // battingOrder 재정렬
+      const reorderedLineup = newLineup.map((p, i) => ({
+        ...p,
+        battingOrder: i + 1
+      }));
+
+      setTempAttackLineup(reorderedLineup);
+
+      // 현재 타자 처리
+      if (game.currentBatterIndex === index) {
+        // 삭제된 선수가 현재 타자인 경우 다음 타자로 이동
+        const newBatterIndex = index >= reorderedLineup.length ? 0 : index;
+        game.currentBatterIndex = newBatterIndex;
+      } else if (game.currentBatterIndex > index) {
+        // 삭제된 선수보다 뒤에 있던 타자는 인덱스 -1
+        game.currentBatterIndex = game.currentBatterIndex - 1;
+      }
+
+      // 기록 삭제 옵션이 true면 추가 처리
+      if (deleteRecords) {
+        // 팀 점수에서 선수의 득점 차감
+        const runsToDeduct = player.stats?.runs || 0;
+        if (runsToDeduct > 0) {
+          const attackTeam = game.isTopInning ? game.teamA : game.teamB;
+          attackTeam.runs = Math.max(0, attackTeam.runs - runsToDeduct);
+        }
+
+        // 주자에 이 선수가 있으면 제거
+        const runners = game.runners || { first: null, second: null, third: null };
+        ['first', 'second', 'third'].forEach(base => {
+          if (runners[base]?.playerId === player.id || runners[base]?.playerId === player.playerId) {
+            runners[base] = null;
+          }
+        });
+        game.runners = runners;
+
+        // 타석 상세 기록에서 이 선수 관련 기록 삭제
+        const attackTeam = game.isTopInning ? game.teamA : game.teamB;
+        if (attackTeam.hitDetails) {
+          attackTeam.hitDetails = attackTeam.hitDetails.filter(detail =>
+            detail.playerId !== player.id && detail.playerId !== player.playerId
+          );
+        }
+      }
+
+      console.log(`✅ 공격팀 선수 삭제 완료: ${player.name} (기록 삭제: ${deleteRecords})`);
+
+    } else if (team === 'defense') {
+      // 수비팀 라인업에서 제거
+      const newLineup = tempDefenseLineup.filter((_, i) => i !== index);
+      setTempDefenseLineup(newLineup);
+
+      // 기록 삭제 옵션이 true면 수비 기록도 처리
+      if (deleteRecords) {
+        // 수비팀의 경우 별도 처리 필요하면 여기에 추가
+        console.log(`✅ 수비팀 선수 삭제 완료: ${player.name} (기록 삭제: ${deleteRecords})`);
+      }
+    }
+
+    // 모달 닫기 및 상태 초기화
+    setShowDeletePlayerModal(false);
+    setShowDeleteOptionsModal(false);
+    setDeletingPlayerInfo(null);
+  };
+
+  // 삭제 취소
+  const handleCancelDelete = () => {
+    setShowDeletePlayerModal(false);
+    setShowDeleteOptionsModal(false);
+    setDeletingPlayerInfo(null);
+  };
+
+  // ============================================================
   // 주자 수동 이동 핸들러 (하이브리드 방식의 수동 조정 기능)
   const handleRunnerMove = async (fromBase, toBase) => {
     if (game.status === 'completed') {
@@ -3016,17 +3167,32 @@ const GameScreen = ({ gameId, onExit }) => {
                                       />
                                     </div>
 
-                                    <button
-                                      onClick={() => {
-                                        setReplacingPlayerIndex(i);
-                                        setReplacingTeam('attack');
-                                        setShowPlayerReplaceModal(true);
-                                      }}
-                                      className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-0.5 rounded transition"
-                                      title="선수 교체"
-                                    >
-                                      교체
-                                    </button>
+                                    {/* 편집 모드: 교체 + 삭제 버튼 */}
+                                    <div className="flex gap-1">
+                                      <button
+                                        onClick={() => {
+                                          setReplacingPlayerIndex(i);
+                                          setReplacingTeam('attack');
+                                          setShowPlayerReplaceModal(true);
+                                        }}
+                                        className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-0.5 rounded transition"
+                                        title="선수 교체"
+                                      >
+                                        교체
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteAttackPlayer(i)}
+                                        disabled={tempAttackLineup.length <= 1}
+                                        className={`text-xs px-2 py-0.5 rounded transition ${
+                                          tempAttackLineup.length <= 1
+                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            : 'bg-red-100 hover:bg-red-200 text-red-700'
+                                        }`}
+                                        title={tempAttackLineup.length <= 1 ? '최소 1명은 남아있어야 합니다' : '선수 삭제'}
+                                      >
+                                        삭제
+                                      </button>
+                                    </div>
                                   </div>
                                 </td>
 
@@ -3482,19 +3648,33 @@ const GameScreen = ({ gameId, onExit }) => {
                               />
                             </div>
 
-                            {/* 편집 모드일 때만 교체 버튼 표시 */}
+                            {/* 편집 모드일 때만 교체 + 삭제 버튼 표시 */}
                             {isDefenseEditMode && (
-                              <button
-                                onClick={() => {
-                                  setReplacingPlayerIndex(i);
-                                  setReplacingTeam('defense');
-                                  setShowPlayerReplaceModal(true);
-                                }}
-                                className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-0.5 rounded transition"
-                                title="선수 교체"
-                              >
-                                교체
-                              </button>
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => {
+                                    setReplacingPlayerIndex(i);
+                                    setReplacingTeam('defense');
+                                    setShowPlayerReplaceModal(true);
+                                  }}
+                                  className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-0.5 rounded transition"
+                                  title="선수 교체"
+                                >
+                                  교체
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteDefensePlayer(i)}
+                                  disabled={tempDefenseLineup.length <= 1}
+                                  className={`text-xs px-2 py-0.5 rounded transition ${
+                                    tempDefenseLineup.length <= 1
+                                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                      : 'bg-red-100 hover:bg-red-200 text-red-700'
+                                  }`}
+                                  title={tempDefenseLineup.length <= 1 ? '최소 1명은 남아있어야 합니다' : '선수 삭제'}
+                                >
+                                  삭제
+                                </button>
+                              </div>
                             )}
                           </div>
                         </td>
@@ -3855,6 +4035,101 @@ const GameScreen = ({ gameId, onExit }) => {
         initialCount={inningCountInput}
         onConfirm={handleConfirmAddInnings}
       />
+
+      {/* 선수 삭제 확인 모달 (1단계) */}
+      <Dialog open={showDeletePlayerModal} onOpenChange={setShowDeletePlayerModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>선수 삭제 확인</DialogTitle>
+            <DialogDescription>
+              정말로 <strong className="text-red-600">{deletingPlayerInfo?.player?.name}</strong>을(를) 라인업에서 삭제하시겠습니까?
+              <br />
+              <span className="text-xs text-gray-500 mt-2 block">
+                ※ 원본 팀 데이터는 유지됩니다 (이번 경기에서만 제외)
+              </span>
+              <span className="text-xs text-gray-500 block">
+                ※ 이 작업은 "편집 완료"를 눌러야 최종 저장됩니다.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={handleCancelDelete}
+            >
+              취소
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+            >
+              삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 선수 삭제 옵션 모달 (2단계 - 기록이 있는 경우) */}
+      <Dialog open={showDeleteOptionsModal} onOpenChange={setShowDeleteOptionsModal}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>⚠️ 경기 기록 처리</DialogTitle>
+            <DialogDescription>
+              <strong className="text-blue-600">{deletingPlayerInfo?.player?.name}</strong> 선수는 이미 경기 기록이 있습니다:
+              <div className="mt-3 p-3 bg-gray-50 rounded-md border border-gray-200 space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span>• 안타:</span>
+                  <strong className="text-green-600">{deletingPlayerInfo?.player?.stats?.hits || 0}개</strong>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>• 득점:</span>
+                  <strong className="text-blue-600">{deletingPlayerInfo?.player?.stats?.runs || 0}점</strong>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>• 수비:</span>
+                  <strong className="text-purple-600">{deletingPlayerInfo?.player?.stats?.goodDefense || 0}개</strong>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>• 쿠키:</span>
+                  <strong className="text-yellow-600">{deletingPlayerInfo?.player?.stats?.bonusCookie || 0}개</strong>
+                </div>
+              </div>
+              <div className="mt-4 text-sm">
+                <p className="font-semibold mb-2">기록을 어떻게 처리할까요?</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col gap-2 sm:flex-col">
+            <Button
+              variant="outline"
+              onClick={() => handleDeleteWithOptions(false)}
+              className="w-full"
+            >
+              <div className="text-left w-full">
+                <div className="font-semibold">기록 유지</div>
+                <div className="text-xs text-gray-500">현재 기록은 그대로 두고, 앞으로만 타석에 안 들어감</div>
+              </div>
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => handleDeleteWithOptions(true)}
+              className="w-full"
+            >
+              <div className="text-left w-full">
+                <div className="font-semibold">기록 삭제</div>
+                <div className="text-xs opacity-90">모든 기록 삭제 + 점수 재계산 + 경기수 차감</div>
+              </div>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleCancelDelete}
+              className="w-full"
+            >
+              취소
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
