@@ -358,6 +358,8 @@ const CreateGameModal = ({
                 <Label className="whitespace-nowrap">⚾ 이닝 수:</Label>
                 <Input
                   type="number"
+                  inputMode="numeric"
+                  pattern="[1-9]"
                   value={innings}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -411,6 +413,8 @@ const CreateGameModal = ({
                   {inningEndRule === 'nOuts' && (
                     <Input
                       type="number"
+                      inputMode="numeric"
+                      pattern="[1-5]"
                       value={outsPerInning}
                       onChange={(e) => setOutsPerInning(Math.max(1, Math.min(5, parseInt(e.target.value) || 3)))}
                       min="1"
