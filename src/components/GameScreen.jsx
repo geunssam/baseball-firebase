@@ -2217,16 +2217,7 @@ const GameScreen = ({ gameId, onExit }) => {
     if (beforeHitRunners?.second) allOriginalRunners.push({ ...beforeHitRunners.second, base: 'second' });
     if (beforeHitRunners?.first) allOriginalRunners.push({ ...beforeHitRunners.first, base: 'first' });
 
-    // ✅ 타자도 득점 계산 대상에 추가 (홈런 타자 득점 누락 방지)
-    if (currentBatter) {
-      allOriginalRunners.push({
-        name: currentBatter.name,
-        playerIndex: currentBatter.playerIndex,
-        base: 'batter'
-      });
-    }
-
-    // 각 원래 주자(+ 타자)가 현재 어디에 있는지 확인
+    // 각 원래 주자가 현재 어디에 있는지 확인
     allOriginalRunners.forEach(runner => {
       const isOnFirst = adjustedRunners.first?.playerIndex === runner.playerIndex;
       const isOnSecond = adjustedRunners.second?.playerIndex === runner.playerIndex;
@@ -2239,6 +2230,25 @@ const GameScreen = ({ gameId, onExit }) => {
         console.log(`🏃 ${runner.name} 홈인! (원래 위치: ${runner.base})`);
       }
     });
+
+    // ✅ 타자 득점 처리 (주자와 별도로 체크)
+    // 타자가 아웃이 아니고, 어떤 베이스에도 없으면 홈인으로 간주 (홈런)
+    if (currentBatter && batterStatus !== 'out') {
+      const batterOnFirst = adjustedRunners.first?.playerIndex === currentBatter.playerIndex;
+      const batterOnSecond = adjustedRunners.second?.playerIndex === currentBatter.playerIndex;
+      const batterOnThird = adjustedRunners.third?.playerIndex === currentBatter.playerIndex;
+
+      // 타자가 어떤 베이스에도 없으면 홈인으로 간주 (홈런)
+      if (!batterOnFirst && !batterOnSecond && !batterOnThird) {
+        scoredRunners.push({
+          name: currentBatter.name,
+          playerIndex: currentBatter.playerIndex,
+          base: 'batter'
+        });
+        runsScored++;
+        console.log(`🏃 ${currentBatter.name} 홈인! (홈런)`);
+      }
+    }
 
     // 득점한 주자들의 runs 스탯 증가 및 배지 체크
     const runBadges = []; // 득점으로 획득한 배지들
