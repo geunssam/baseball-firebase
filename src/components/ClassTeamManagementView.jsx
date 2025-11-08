@@ -2589,10 +2589,7 @@ export default function ClassTeamManagementView() {
               <Label htmlFor="bulkStudents">학생 이름 *</Label>
               <Textarea
                 id="bulkStudents"
-                placeholder={`홍길동,남
-김영희,여
-박철수,남
-이순이,여`}
+                placeholder={['홍길동,남', '김영희,여', '박철수,남', '이순이,여'].join('\n')}
                 value={bulkStudentNames}
                 onChange={(e) => setBulkStudentNames(e.target.value)}
                 rows={8}
