@@ -25,6 +25,9 @@ import StudentCodeListModal from './StudentCodeListModal';
 import GameEndModal from './GameEndModal';
 import CookieAwardModal from './CookieAwardModal';
 import AddInningsModal from './AddInningsModal';
+import SettingsView from './SettingsView';
+import ClassRankingWidget from './ClassRankingWidget';
+import ClassDetailRankingModal from './ClassDetailRankingModal';
 import { checkNewBadges, calculatePlayerTotalStats, BADGES } from '../utils/badgeSystem';
 import { getNextBadgesProgress } from '../utils/badgeProgress';
 import {
@@ -170,6 +173,16 @@ const GameScreen = ({ gameId, onExit }) => {
 
   // 학생 코드 모달
   const [showStudentCodeModal, setShowStudentCodeModal] = useState(false);
+
+  // 설정 및 학급 랭킹 모달
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showClassRankingModal, setShowClassRankingModal] = useState(false);
+  const [showClassDetailModal, setShowClassDetailModal] = useState(false);
+  const [selectedClassData, setSelectedClassData] = useState(null);
+
+  // 배지 관리 상태 (설정 모달용)
+  const [customBadges, setCustomBadges] = useState([]);
+  const [hiddenBadges, setHiddenBadges] = useState([]);
 
   // 안타 상세 기록 접기/펼치기 상태
   const [isAllExpandedTeamA, setIsAllExpandedTeamA] = useState(false); // 팀A 전체 펼치기 여부
@@ -2494,6 +2507,20 @@ const GameScreen = ({ gameId, onExit }) => {
               >
                 📋 학생코드
               </Button>
+              <Button
+                onClick={() => setShowClassRankingModal(true)}
+                size="sm"
+                className="bg-yellow-100 hover:bg-yellow-200 text-yellow-700 border-yellow-200 text-sm tablet:text-base tablet-lg:text-lg"
+              >
+                🏆 학급 랭킹
+              </Button>
+              <Button
+                onClick={() => setShowSettingsModal(true)}
+                size="sm"
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-200 text-sm tablet:text-base tablet-lg:text-lg"
+              >
+                ⚙️ 설정
+              </Button>
               <Button onClick={signOut} size="sm" className="bg-red-100 hover:bg-red-200 text-red-700 border-red-200 text-sm tablet:text-base tablet-lg:text-lg">
                 로그아웃
               </Button>
@@ -4044,6 +4071,65 @@ const GameScreen = ({ gameId, onExit }) => {
         isOpen={showStudentCodeModal}
         onClose={() => setShowStudentCodeModal(false)}
       />
+
+      {/* 학급 랭킹 모달 */}
+      <Dialog open={showClassRankingModal} onOpenChange={setShowClassRankingModal}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">🏆 학급별 랭킹</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <ClassRankingWidget
+              teacherId={user?.uid}
+              onClassClick={(classData) => {
+                setSelectedClassData(classData);
+                setShowClassDetailModal(true);
+              }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 학급 상세 랭킹 모달 */}
+      <ClassDetailRankingModal
+        open={showClassDetailModal}
+        onOpenChange={setShowClassDetailModal}
+        classData={selectedClassData}
+      />
+
+      {/* 설정 모달 */}
+      <Dialog open={showSettingsModal} onOpenChange={setShowSettingsModal}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">⚙️ 설정</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto py-4">
+            <SettingsView
+              onBack={() => setShowSettingsModal(false)}
+              customBadges={customBadges}
+              systemBadges={Object.values(BADGES)}
+              hiddenBadges={hiddenBadges}
+              onSaveBadge={async (badge) => {
+                // 배지 저장 로직 (필요시 구현)
+                console.log('배지 저장:', badge);
+              }}
+              onDeleteBadge={async (badgeId) => {
+                // 배지 삭제 로직 (필요시 구현)
+                console.log('배지 삭제:', badgeId);
+              }}
+              onToggleBadgeVisibility={(badgeId) => {
+                // 배지 숨기기 로직 (필요시 구현)
+                console.log('배지 숨기기 토글:', badgeId);
+              }}
+              gameDefaultSettings={null}
+              onSaveGameSettings={async (settings) => {
+                // 경기 설정 저장 로직 (필요시 구현)
+                console.log('경기 설정 저장:', settings);
+              }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* 경기 종료 모달 */}
       <GameEndModal

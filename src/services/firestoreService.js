@@ -518,12 +518,21 @@ class FirestoreService {
    * @param {string} classId - 학급 ID
    */
   async deleteClass(classId) {
+    console.log('🗑️ [firestoreService] 학급 삭제 시작:', classId);
+
     try {
       const classRef = this.getUserDoc('classes', classId);
+      console.log('📍 [firestoreService] 삭제 경로:', classRef.path);
+
       await deleteDoc(classRef);
-      console.log('✅ 학급 삭제 완료:', classId);
+      console.log('✅ [firestoreService] 학급 삭제 완료:', classId);
     } catch (error) {
-      console.error('❌ 학급 삭제 실패:', error);
+      console.error('❌ [firestoreService] 학급 삭제 실패:', {
+        classId,
+        error: error.message,
+        code: error.code,
+        fullError: error
+      });
       throw new Error('학급 삭제에 실패했습니다.');
     }
   }

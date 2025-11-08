@@ -1201,6 +1201,24 @@ export default function ClassTeamManagementView() {
       return;
     }
 
+    // classId 검증 강화
+    if (!classObj.id) {
+      console.error('학급 ID를 찾을 수 없음:', {
+        className,
+        classObj,
+        allClasses: classes.map(c => ({ id: c.id, name: c.name }))
+      });
+      alert('학급 정보를 찾을 수 없습니다. 새로고침 후 다시 시도해주세요.');
+      return;
+    }
+
+    // 삭제 정보 로그
+    console.log('🗑️ 삭제 대상:', {
+      className,
+      classId: classObj.id,
+      studentCount
+    });
+
     const deletedItems = [
       `학급 정보 (${className})`,
       studentCount > 0 && `학생 ${studentCount}명의 모든 정보`,
@@ -2030,9 +2048,9 @@ export default function ClassTeamManagementView() {
                   <div className="flex items-center gap-2">
                     <span className="text-lg">🏆</span>
                     <span className="font-bold text-yellow-600">
-                      배지: {studentsByClass[selectedClass].reduce((sum, student) =>
+                      배지: {studentsByClass[selectedClass]?.reduce((sum, student) =>
                         sum + (student.badges?.length || 0), 0
-                      )}개
+                      ) ?? 0}개
                     </span>
                   </div>
                 </div>

@@ -64,8 +64,11 @@ export const GameProvider = ({ children }) => {
     // 1. 학급 목록 실시간 동기화
     const unsubscribeClasses = firestoreService.subscribeToClasses((updatedClasses) => {
       console.log('🔄 [GameContext] 학급 목록 콜백 호출됨!', updatedClasses);
+      console.log('🔄 [GameContext] 학급 목록 업데이트:', {
+        count: updatedClasses.length,
+        classes: updatedClasses.map(c => ({ id: c.id, name: c.name }))
+      });
       setClasses(updatedClasses);
-      console.log('🔄 [GameContext] 학급 목록 업데이트:', updatedClasses.length);
     });
 
     // 2. 학생 목록 실시간 동기화
