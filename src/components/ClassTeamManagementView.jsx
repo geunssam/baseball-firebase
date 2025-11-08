@@ -493,7 +493,7 @@ const SortableStudentCard = ({
  */
 export default function ClassTeamManagementView() {
   const { user } = useAuth();
-  const { classes, students, teams, createStudent, updateStudent, deleteStudent, deleteClass, createTeam, updateTeam, deleteTeam } = useGame();
+  const { classes, students, teams, createClass, createStudent, updateStudent, deleteStudent, deleteClass, createTeam, updateTeam, deleteTeam, getPlayerHistory } = useGame();
 
   // ============================================
   // 상태 관리
@@ -592,6 +592,9 @@ export default function ClassTeamManagementView() {
   // 이전 students 값을 추적 (실제 변경 감지용)
   const prevStudentsRef = useRef(students);
 
+  // 레거시 학급 마이그레이션 완료 여부 추적
+  const migrationCompletedRef = useRef(false);
+
   // 학급 변경 시 reorderedStudents 초기화
   useEffect(() => {
     setReorderedStudents(null);
@@ -670,6 +673,51 @@ export default function ClassTeamManagementView() {
 
     return result;
   }, [classes, studentsByClass]);
+
+  // ============================================
+  // 레거시 학급 자동 마이그레이션 (한 번만 실행)
+  // ============================================
+  useEffect(() => {
+    const migrateLegacyClasses = async () => {
+      // 이미 마이그레이션을 완료했으면 종료
+      if (migrationCompletedRef.current) return;
+
+      // studentsByClass에 있지만 classes 컬렉션에 없는 학급 찾기 (레거시 학급)
+      const legacyClassNames = Object.keys(studentsByClass).filter(
+        name => name !== '미지정' && !classes.some(c => c.name === name)
+      );
+
+      // 레거시 학급이 없으면 종료
+      if (legacyClassNames.length === 0) {
+        migrationCompletedRef.current = true; // 마이그레이션 완료 표시
+        return;
+      }
+
+      console.log('🔄 레거시 학급 마이그레이션 시작:', legacyClassNames);
+      console.log(`  📊 발견된 레거시 학급: ${legacyClassNames.length}개`);
+
+      // 각 레거시 학급을 classes 컬렉션에 생성
+      for (const className of legacyClassNames) {
+        try {
+          await createClass({ name: className });
+          console.log(`  ✅ 레거시 학급 생성 완료: "${className}"`);
+        } catch (error) {
+          console.error(`  ❌ 레거시 학급 생성 실패: "${className}"`, error);
+        }
+      }
+
+      console.log('🎉 레거시 학급 마이그레이션 완료!');
+      console.log('  → 이제 모든 학급 카드를 정상적으로 삭제할 수 있습니다.');
+
+      // 마이그레이션 완료 표시 (다시 실행 안 됨)
+      migrationCompletedRef.current = true;
+    };
+
+    // classes와 studentsByClass가 모두 로드된 후 실행
+    if (classes.length >= 0 && Object.keys(studentsByClass).length > 0) {
+      migrateLegacyClasses();
+    }
+  }, [classes, studentsByClass, createClass]);
 
   // ============================================
   // selectedTeam 자동 동기화
